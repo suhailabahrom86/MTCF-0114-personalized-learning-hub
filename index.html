@@ -18,7 +18,7 @@
   --shadow:0 2px 8px rgba(31,41,51,0.08);
 }
 *{box-sizing:border-box;}
-html{scroll-behavior:smooth;}
+html{scroll-behavior:smooth; overflow-y:scroll;}
 body{
   margin:0; font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
   background:var(--bg); color:var(--charcoal); line-height:1.55;
@@ -37,7 +37,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 header.site-header{
   background:linear-gradient(135deg,var(--turquoise) 0%, var(--turquoise-dark) 100%);
   color:#fff; position:sticky; top:0; z-index:50; box-shadow:var(--shadow);
+  transform:translateZ(0); will-change:transform; contain:layout style;
 }
+nav.main-nav{ transform:translateZ(0); }
+nav.main-nav button.nav-btn{ touch-action:manipulation; }
 .header-top{display:flex; align-items:center; justify-content:space-between; padding:10px 16px; max-width:1100px; margin:0 auto;}
 .brand{display:flex; align-items:center; gap:10px;}
 .brand-emblem{width:40px;height:40px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--turquoise-dark);font-size:13px;flex-shrink:0;}
@@ -51,7 +54,7 @@ nav.main-nav ul{list-style:none; display:flex; flex-wrap:wrap; gap:2px; margin:0
 nav.main-nav button.nav-btn{
   background:none; border:none; color:#fff; padding:9px 12px; font-size:12.5px; border-radius:6px; white-space:nowrap;
 }
-nav.main-nav button.nav-btn:hover, nav.main-nav button.nav-btn.active{background:rgba(255,255,255,0.2); font-weight:600;}
+nav.main-nav button.nav-btn:hover, nav.main-nav button.nav-btn.active{background:rgba(255,255,255,0.2); text-shadow:0 0 0.35px currentColor, 0 0 0.35px currentColor;}
 @media (max-width:880px){
   .menu-toggle{display:block;}
   nav.main-nav ul{display:none; flex-direction:column;}
@@ -144,6 +147,19 @@ footer.site-footer{background:var(--charcoal); color:#cfd8dc; text-align:center;
 
 @media print{
   header.site-header, nav.main-nav, .btn, footer.site-footer, .no-print{display:none !important;}
+}
+
+/* ---------- Assessment Generator: print mode ---------- */
+#agPrintArea{ display:none; }
+body.ag-printing > *:not(#agPrintArea){ display:none !important; }
+body.ag-printing #agPrintArea{
+  display:block !important; max-width:800px; margin:0 auto; padding:24px; font-family:'Segoe UI',Tahoma,sans-serif; color:#000; background:#fff;
+}
+body.ag-printing #agPrintArea .ag-print-question{ margin-bottom:16px; page-break-inside:avoid; }
+body.ag-printing #agPrintArea .ag-ruled-line{ border-bottom:1px solid #999; height:22px; margin-left:20px; }
+@media print{
+  #agPrintArea{ box-shadow:none; }
+  body.ag-printing #agPrintArea{ padding:0; }
 }
 </style>
 </head>
@@ -873,6 +889,508 @@ const TOPIC_SYSTEMS = {
 };
 
 /* ============================================================
+   MTCF 0114 ASSESSMENT GENERATOR - Question Template Engine
+   Parameterised, randomised, mathematically-verified structured
+   question templates. New values are computed every time a
+   question is generated -- nothing here is a fixed final answer.
+   ============================================================ */
+
+/* ---------- Small maths helpers ---------- */
+function agRandInt(min, max){ return Math.floor(Math.random() * (max - min + 1)) + min; }
+function agRandNonZero(min, max){ let v; do{ v = agRandInt(min,max); }while(v===0); return v; }
+function agPickDistinct(min, max, count){
+  const pool = [];
+  for(let i=min;i<=max;i++) pool.push(i);
+  const chosen = shuffle(pool).slice(0, count);
+  return chosen;
+}
+function agSignedStr(n){ return n >= 0 ? ("+ " + n) : ("\u2212 " + Math.abs(n)); }
+function agFmtLinear(a, b, varName){
+  varName = varName || "x";
+  let s = "";
+  if(a === 1) s += varName; else if(a === -1) s += "\u2212" + varName; else s += a + varName;
+  if(b !== 0) s += " " + agSignedStr(b);
+  return s;
+}
+function agGCD(a,b){ a=Math.abs(a); b=Math.abs(b); while(b){ [a,b]=[b,a%b]; } return a || 1; }
+function agSimplifyFrac(num, den){
+  if(den < 0){ num = -num; den = -den; }
+  const g = agGCD(num, den) || 1;
+  return { num: num/g, den: den/g };
+}
+function agFracStr(num, den){
+  const f = agSimplifyFrac(num, den);
+  if(f.den === 1) return String(f.num);
+  return f.num + "/" + f.den;
+}
+function normaliseAnswer(str){
+  if(str === null || str === undefined) return "";
+  return String(str).toLowerCase().replace(/\s+/g,"").replace(/\u2212/g,"-").replace(/\u00b1/g,"+-");
+}
+function answerMatches(studentAnswer, acceptedList){
+  const s = normaliseAnswer(studentAnswer);
+  if(s === "") return false;
+  return acceptedList.some(function(a){ return normaliseAnswer(a) === s; });
+}
+function subDigit(n){
+  const map = {"0":"\u2080","1":"\u2081","2":"\u2082","3":"\u2083","4":"\u2084","5":"\u2085","6":"\u2086","7":"\u2087","8":"\u2088","9":"\u2089"};
+  return String(n).split("").map(function(d){ return map[d] || d; }).join("");
+}
+
+/* ---------- Template registry ----------
+   Each template is a function() returning:
+   { topicId, subtopic, difficulty, commandWord, skillTag, errorTag,
+     stem (string, shown once before subparts),
+     parts: [ { label, text, marks, type: 'numeric'|'expression'|'self',
+                accepted: [...], hint, marking: [ "step description (mark)" ... ],
+                solution: "full worked solution text" } ],
+     totalMarks }
+------------------------------------------------------------ */
+const AG_TEMPLATES = {
+
+  algebra: [
+    function tplQuadraticFactorise(){
+      const roots = agPickDistinct(-7, 7, 2);
+      const p = roots[0], q = roots[1];
+      const b = -(p+q), c = p*q;
+      const eqStr = "x\u00b2 " + agSignedStr(b) + "x " + agSignedStr(c) + " = 0";
+      const factStr = "(x " + agSignedStr(-p) + ")(x " + agSignedStr(-q) + ")";
+      return {
+        topicId:"algebra", subtopic:"Quadratic Equations", difficulty:"basic", commandWord:"Solve",
+        skillTag:"factorisation", errorTag:"none",
+        stem: "Solve the quadratic equation " + eqStr + ".",
+        parts: [
+          { label:"a", text:"Factorise the left-hand side of the equation.", marks:2, type:"expression",
+            accepted:[factStr, "(x " + agSignedStr(-q) + ")(x " + agSignedStr(-p) + ")"],
+            hint:"Find two numbers that multiply to " + c + " and add to " + b + ".",
+            marking:["Correct pair of factors identified (1)","Factorised expression written correctly (1)"],
+            solution:"We need two numbers that multiply to " + c + " and add to " + b + ": these are " + (-p) + " and " + (-q) + ". So " + eqStr.split(" = ")[0] + " = " + factStr + "." },
+          { label:"b", text:"Hence, state the roots of the equation.", marks:2, type:"expression",
+            accepted:["x="+p+" or x="+q, "x="+q+" or x="+p, p+","+q, q+","+p],
+            hint:"Set each factor equal to zero and solve.",
+            marking:["x = "+p+" obtained (1)","x = "+q+" obtained (1)"],
+            solution:"Setting each factor to zero: x " + agSignedStr(-p) + " = 0 gives x = " + p + "; x " + agSignedStr(-q) + " = 0 gives x = " + q + "." }
+        ]
+      };
+    },
+    function tplLinearInequality(){
+      const a = agRandNonZero(-5,5);
+      let c = agRandNonZero(-5,5);
+      while(c === a){ c = agRandNonZero(-5,5); }
+      let b = agRandInt(-10,10), d = agRandInt(-10,10);
+      // a x + b < c x + d  =>  (a-c) x < d - b
+      const coeff = a - c;
+      let boundNum = d - b;
+      const reversed = coeff < 0;
+      const boundStr = agFracStr(boundNum, coeff);
+      const solStr = reversed ? ("x > " + boundStr) : ("x < " + boundStr);
+      const intervalStr = reversed ? ("(" + boundStr + ", \u221e)") : ("(\u2212\u221e, " + boundStr + ")");
+      return {
+        topicId:"algebra", subtopic:"Linear Inequalities", difficulty:"intermediate", commandWord:"Solve",
+        skillTag:"inequality-sign-reversal", errorTag:"inequality-reversal",
+        stem: "Solve the inequality " + agFmtLinear(a,b) + " < " + agFmtLinear(c,d) + ".",
+        parts:[
+          { label:"a", text:"Solve the inequality for x.", marks:3, type:"expression",
+            accepted:[normaliseAnswer(solStr)],
+            hint:"Collect x terms on one side. Remember: dividing by a negative number reverses the inequality sign.",
+            marking:["x terms and constants correctly collected (1)","Correct division/sign handling (1)","Correct final inequality (1)"],
+            solution: agFmtLinear(a,b) + " < " + agFmtLinear(c,d) + " \u2192 collecting x terms on one side and constants on the other gives " + coeff + "x < " + boundNum + " \u2192 " + solStr + (reversed ? " (sign reversed since we divided by a negative number)" : "") + "." },
+          { label:"b", text:"Express your solution using interval notation.", marks:2, type:"expression",
+            accepted:[normaliseAnswer(intervalStr)],
+            hint:"Use a round bracket for an excluded (open) endpoint and \u00b1\u221e.",
+            marking:["Correct bracket type (1)","Correct interval written (1)"],
+            solution:"The solution x " + (reversed?">":"<") + " " + boundStr + " is written in interval notation as " + intervalStr + "." }
+        ]
+      };
+    },
+    function tplComplexNumbers(){
+      const a = agRandNonZero(-6,6), b = agRandNonZero(-6,6), c = agRandNonZero(-6,6), d = agRandNonZero(-6,6);
+      const realPart = a*c - b*d;
+      const imagPart = a*d + b*c;
+      const prodStr = realPart + (imagPart>=0? " + " + imagPart : " \u2212 " + Math.abs(imagPart)) + "i";
+      const conjStr = a + (b>=0? " \u2212 " + b : " + " + Math.abs(b)) + "i";
+      return {
+        topicId:"algebra", subtopic:"Complex Numbers", difficulty:"challenging", commandWord:"Simplify",
+        skillTag:"complex-numbers", errorTag:"none",
+        stem: "Given z\u2081 = " + a + (b>=0?" + ":" \u2212 ") + Math.abs(b) + "i and z\u2082 = " + c + (d>=0?" + ":" \u2212 ") + Math.abs(d) + "i,",
+        parts:[
+          { label:"a", text:"Find z\u2081 \u00d7 z\u2082 in the form p + qi.", marks:3, type:"expression",
+            accepted:[normaliseAnswer(prodStr)],
+            hint:"Expand as you would with brackets, then use i\u00b2 = \u22121.",
+            marking:["Correct expansion of four terms (1)","i\u00b2 replaced with \u22121 correctly (1)","Correct final form p + qi (1)"],
+            solution:"z\u2081z\u2082 = (" + a + (b>=0?"+":"") + b + "i)(" + c + (d>=0?"+":"") + d + "i) = " + (a*c) + " + " + (a*d) + "i + " + (b*c) + "i + " + (b*d) + "i\u00b2 = (" + (a*c) + agSignedStr(-(b*d)).replace("+","+ ") + ") + (" + (a*d) + agSignedStr(b*c) + ")i = " + prodStr + "." },
+          { label:"b", text:"State the conjugate of z\u2081.", marks:1, type:"expression",
+            accepted:[normaliseAnswer(conjStr)],
+            hint:"The conjugate of p + qi is p \u2212 qi.",
+            marking:["Correct conjugate stated (1)"],
+            solution:"The conjugate of z\u2081 = " + a + (b>=0?"+":"") + b + "i is " + conjStr + "." }
+        ]
+      };
+    }
+  ],
+
+  functions: [
+    function tplEvaluateInverse(){
+      const a = agRandNonZero(-6,6), b = agRandInt(-8,8);
+      const k = agRandInt(-5,5);
+      const fk = a*k + b;
+      const invStr = "(x " + agSignedStr(-b) + ")/" + a;
+      return {
+        topicId:"functions", subtopic:"Function Notation and Inverses", difficulty:"basic", commandWord:"Evaluate",
+        skillTag:"function-evaluation", errorTag:"none",
+        stem: "The function f is defined by f(x) = " + agFmtLinear(a,b) + ".",
+        parts:[
+          { label:"a", text:"Find f(" + k + ").", marks:2, type:"numeric",
+            accepted:[String(fk)],
+            hint:"Substitute x = " + k + " into f(x).",
+            marking:["Correct substitution (1)","Correct value (1)"],
+            solution:"f(" + k + ") = " + a + "(" + k + ") " + agSignedStr(b) + " = " + fk + "." },
+          { label:"b", text:"Find f\u207b\u00b9(x).", marks:3, type:"expression",
+            accepted:[normaliseAnswer(invStr), normaliseAnswer("x/"+a+agSignedStr(-b/a))],
+            hint:"Let y = f(x), swap x and y, then solve for y.",
+            marking:["x and y swapped correctly (1)","Correctly isolate y (1)","Correct final inverse function (1)"],
+            solution:"Let y = " + agFmtLinear(a,b) + ". Swap: x = " + agFmtLinear(a,b,"y") + ". Solve for y: y = " + invStr + ". So f\u207b\u00b9(x) = " + invStr + "." }
+        ]
+      };
+    },
+    function tplDomainRational(){
+      const roots = agPickDistinct(-6,6,2);
+      const p = roots[0], q = roots[1];
+      return {
+        topicId:"functions", subtopic:"Domain of Rational Functions", difficulty:"intermediate", commandWord:"Determine",
+        skillTag:"domain-restriction", errorTag:"domain-restriction",
+        stem: "Consider the function g(x) = 5 / [(x " + agSignedStr(-p) + ")(x " + agSignedStr(-q) + ")].",
+        parts:[
+          { label:"a", text:"State the value(s) of x for which g(x) is undefined.", marks:2, type:"expression",
+            accepted:[normaliseAnswer("x="+p+",x="+q), normaliseAnswer("x="+q+",x="+p)],
+            hint:"g(x) is undefined when the denominator equals zero.",
+            marking:["x = "+p+" identified (1)","x = "+q+" identified (1)"],
+            solution:"The denominator is zero when x = " + p + " or x = " + q + ", so g(x) is undefined at these values." },
+          { label:"b", text:"State the domain of g(x) using set notation.", marks:2, type:"expression",
+            accepted:[normaliseAnswer("{x:x\u2260"+p+",x\u2260"+q+"}"), normaliseAnswer("allrealxexceptx="+p+"andx="+q)],
+            hint:"The domain is all real numbers except the excluded values from part (a).",
+            marking:["Correct set notation structure (1)","Both excluded values correctly stated (1)"],
+            solution:"Domain = {x \u2208 \u211d : x \u2260 " + p + ", x \u2260 " + q + "}." }
+        ]
+      };
+    }
+  ],
+
+  polynomial: [
+    function tplRemainderTheorem(){
+      const a = agRandInt(-4,4), b = agRandInt(-6,6), c = agRandInt(-8,8);
+      const k = agRandInt(-3,3);
+      const remainder = k*k*k + a*k*k + b*k + c;
+      return {
+        topicId:"polynomial", subtopic:"Remainder and Factor Theorem", difficulty:"intermediate", commandWord:"Apply",
+        skillTag:"remainder-theorem", errorTag:"none",
+        stem: "Let P(x) = x\u00b3 " + agSignedStr(a) + "x\u00b2 " + agSignedStr(b) + "x " + agSignedStr(c) + ".",
+        parts:[
+          { label:"a", text:"Use the remainder theorem to find the remainder when P(x) is divided by (x " + agSignedStr(-k) + ").", marks:3, type:"numeric",
+            accepted:[String(remainder)],
+            hint:"The remainder equals P(" + k + ").",
+            marking:["Correct substitution of x = "+k+" (1)","Correct arithmetic (1)","Correct remainder stated (1)"],
+            solution:"By the remainder theorem, the remainder = P(" + k + ") = (" + k + ")\u00b3 " + agSignedStr(a) + "(" + k + ")\u00b2 " + agSignedStr(b) + "(" + k + ") " + agSignedStr(c) + " = " + remainder + "." },
+          { label:"b", text:"Hence, state whether (x " + agSignedStr(-k) + ") is a factor of P(x), giving a reason.", marks:1, type:"expression",
+            accepted:[remainder===0?"yes":"no"],
+            hint:"(x \u2212 k) is a factor only if P(k) = 0.",
+            marking:["Correct yes/no conclusion with reason (1)"],
+            solution: remainder===0 ? "Since P("+k+") = 0, (x "+agSignedStr(-k)+") IS a factor of P(x)." : "Since P("+k+") = " + remainder + " \u2260 0, (x "+agSignedStr(-k)+") is NOT a factor of P(x)." }
+        ]
+      };
+    },
+    function tplAsymptotes(){
+      const m = agRandNonZero(-4,4), n = agRandInt(-6,6), p = agRandNonZero(-4,4), q = agRandInt(-6,6);
+      const va = agFracStr(-q, p);
+      const ha = agFracStr(m, p);
+      return {
+        topicId:"polynomial", subtopic:"Rational Functions and Asymptotes", difficulty:"assessment", commandWord:"Determine",
+        skillTag:"asymptotes", errorTag:"asymptote-error",
+        stem: "Consider the rational function h(x) = (" + agFmtLinear(m,n) + ") / (" + agFmtLinear(p,q) + ").",
+        parts:[
+          { label:"a", text:"Find the equation of the vertical asymptote.", marks:2, type:"expression",
+            accepted:[normaliseAnswer("x="+va)],
+            hint:"Set the denominator equal to zero and solve for x.",
+            marking:["Denominator correctly set to zero (1)","Correct vertical asymptote stated (1)"],
+            solution:"Set the denominator to zero: " + agFmtLinear(p,q) + " = 0, giving x = " + va + ". So the vertical asymptote is x = " + va + "." },
+          { label:"b", text:"Find the equation of the horizontal asymptote.", marks:2, type:"expression",
+            accepted:[normaliseAnswer("y="+ha)],
+            hint:"Since the numerator and denominator have the same degree, compare the leading coefficients.",
+            marking:["Recognises equal degrees (1)","Correct horizontal asymptote stated (1)"],
+            solution:"Since the numerator and denominator are both degree 1, the horizontal asymptote is the ratio of leading coefficients: y = " + m + "/" + p + " = " + ha + "." }
+        ]
+      };
+    }
+  ],
+
+  explog: [
+    function tplExponentialEquation(){
+      const base = [2,3,5][agRandInt(0,2)];
+      const k = agRandInt(-4,4);
+      const rhsExp = agRandInt(1,6);
+      const x = rhsExp - k;
+      return {
+        topicId:"explog", subtopic:"Exponential Equations", difficulty:"intermediate", commandWord:"Solve",
+        skillTag:"exponential-equations", errorTag:"none",
+        stem: "Solve the equation " + base + "^(x " + agSignedStr(k) + ") = " + Math.pow(base, rhsExp) + ".",
+        parts:[
+          { label:"a", text:"Express the right-hand side as a power of " + base + ".", marks:2, type:"expression",
+            accepted:[normaliseAnswer(base+"^"+rhsExp), normaliseAnswer(base+"^("+rhsExp+")")],
+            hint:"Write " + Math.pow(base,rhsExp) + " as " + base + " raised to a power.",
+            marking:["Correct base identified (1)","Correct power written (1)"],
+            solution: Math.pow(base,rhsExp) + " = " + base + "^" + rhsExp + "." },
+          { label:"b", text:"Hence, solve for x.", marks:2, type:"numeric",
+            accepted:[String(x)],
+            hint:"Since the bases are equal, equate the exponents.",
+            marking:["Exponents correctly equated (1)","Correct value of x (1)"],
+            solution:"Since the bases match, x " + agSignedStr(k) + " = " + rhsExp + ", so x = " + x + "." }
+        ]
+      };
+    },
+    function tplLogEquation(){
+      const base = [2,3,5][agRandInt(0,2)];
+      const power = agRandInt(2,4);
+      const shift = agRandInt(-5,5);
+      const xVal = Math.pow(base,power) - shift;
+      return {
+        topicId:"explog", subtopic:"Logarithmic Equations", difficulty:"assessment", commandWord:"Solve",
+        skillTag:"log-equations", errorTag:"domain-restriction",
+        stem: "Solve the equation log" + subDigit(base) + "(x " + agSignedStr(shift) + ") = " + power + ".",
+        parts:[
+          { label:"a", text:"Rewrite the equation in exponential form.", marks:2, type:"expression",
+            accepted:[normaliseAnswer("x"+agSignedStr(shift)+"="+base+"^"+power)],
+            hint:"log_b(A) = c means A = b^c.",
+            marking:["Correct base and exponent identified (1)","Correctly rewritten in exponential form (1)"],
+            solution:"log" + subDigit(base) + "(x " + agSignedStr(shift) + ") = " + power + " means x " + agSignedStr(shift) + " = " + base + "^" + power + " = " + Math.pow(base,power) + "." },
+          { label:"b", text:"Hence, solve for x.", marks:2, type:"numeric",
+            accepted:[String(xVal)],
+            hint:"Rearrange the exponential-form equation from part (a) to isolate x.",
+            marking:["Correct rearrangement (1)","Correct value of x, checked against the domain (1)"],
+            solution:"x " + agSignedStr(shift) + " = " + Math.pow(base,power) + ", so x = " + xVal + ". Since x " + agSignedStr(shift) + " = " + Math.pow(base,power) + " > 0, this value satisfies the domain of the logarithm." }
+        ]
+      };
+    }
+  ],
+
+  trig: [
+    function tplExactValue(){
+      const table = {
+        30: {sin:"1/2", cos:"\u221a3/2", tan:"\u221a3/3"},
+        45: {sin:"\u221a2/2", cos:"\u221a2/2", tan:"1"},
+        60: {sin:"\u221a3/2", cos:"1/2", tan:"\u221a3"}
+      };
+      const baseAngles = [30,45,60];
+      const base = baseAngles[agRandInt(0,2)];
+      const quadrantChoice = agRandInt(1,4);
+      let angle, sign, quadName;
+      if(quadrantChoice===1){ angle = base; sign = {sin:1,cos:1,tan:1}; quadName="Quadrant I"; }
+      else if(quadrantChoice===2){ angle = 180-base; sign = {sin:1,cos:-1,tan:-1}; quadName="Quadrant II"; }
+      else if(quadrantChoice===3){ angle = 180+base; sign = {sin:-1,cos:-1,tan:1}; quadName="Quadrant III"; }
+      else { angle = 360-base; sign = {sin:-1,cos:1,tan:-1}; quadName="Quadrant IV"; }
+      const funcs = ["sin","cos","tan"];
+      const func = funcs[agRandInt(0,2)];
+      const magnitude = table[base][func];
+      const finalVal = (sign[func]===-1 ? "\u2212" : "") + magnitude;
+      return {
+        topicId:"trig", subtopic:"Exact Trigonometric Values", difficulty:"intermediate", commandWord:"Find",
+        skillTag:"reference-angle", errorTag:"none",
+        stem: "Find the exact value of " + func + "(" + angle + "\u00b0) without using a calculator.",
+        parts:[
+          { label:"a", text:"State the quadrant and the reference angle for " + angle + "\u00b0.", marks:2, type:"expression",
+            accepted:[normaliseAnswer(quadName+","+base+"\u00b0"), normaliseAnswer(quadName)],
+            hint:"Locate " + angle + "\u00b0 on the unit circle to identify the quadrant, then measure the acute angle to the x-axis.",
+            marking:["Correct quadrant (1)","Correct reference angle (1)"],
+            solution: angle + "\u00b0 lies in " + quadName + ", with reference angle " + base + "\u00b0." },
+          { label:"b", text:"Hence, state the exact value of " + func + "(" + angle + "\u00b0).", marks:2, type:"expression",
+            accepted:[normaliseAnswer(finalVal)],
+            hint:"Use the sign of " + func + " in " + quadName + " together with the reference angle value.",
+            marking:["Correct magnitude from special angle (1)","Correct sign applied for the quadrant (1)"],
+            solution: func + "(" + base + "\u00b0) = " + magnitude + ", and since " + func + " is " + (sign[func]===1?"positive":"negative") + " in " + quadName + ", " + func + "(" + angle + "\u00b0) = " + finalVal + "." }
+        ]
+      };
+    },
+    function tplAmplitudePeriod(){
+      const a = agRandNonZero(-6,6);
+      const bVal = [1,2,3,4][agRandInt(0,3)];
+      const funcName = Math.random()<0.5 ? "sin" : "cos";
+      const periodNum = 2, periodDen = bVal; // period = 2pi/b
+      const periodStr = (bVal===1) ? "2\u03c0" : "2\u03c0/" + bVal;
+      return {
+        topicId:"trig", subtopic:"Amplitude and Period", difficulty:"basic", commandWord:"State",
+        skillTag:"amplitude-period", errorTag:"none",
+        stem: "A sinusoidal function is given by y = " + a + funcName + "(" + (bVal===1?"":bVal) + "x).",
+        parts:[
+          { label:"a", text:"State the amplitude of the function.", marks:1, type:"numeric",
+            accepted:[String(Math.abs(a))],
+            hint:"Amplitude is always the absolute value of the coefficient in front of " + funcName + ".",
+            marking:["Correct amplitude (1)"],
+            solution:"Amplitude = |" + a + "| = " + Math.abs(a) + "." },
+          { label:"b", text:"State the period of the function.", marks:2, type:"expression",
+            accepted:[normaliseAnswer(periodStr)],
+            hint:"Period = 2\u03c0 divided by the coefficient of x.",
+            marking:["Correct formula used (1)","Correct period stated (1)"],
+            solution:"Period = 2\u03c0 / " + bVal + " = " + periodStr + "." }
+        ]
+      };
+    }
+  ],
+
+  systems: [
+    function tplLinearSystemElimination(){
+      let a1,b1,a2,b2;
+      let det;
+      do{
+        a1=agRandNonZero(-5,5); b1=agRandNonZero(-5,5); a2=agRandNonZero(-5,5); b2=agRandNonZero(-5,5);
+        det = a1*b2 - a2*b1;
+      } while(det===0);
+      const xVal = agRandInt(-5,5), yVal = agRandInt(-5,5);
+      const c1 = a1*xVal + b1*yVal;
+      const c2 = a2*xVal + b2*yVal;
+      return {
+        topicId:"systems", subtopic:"Systems of Linear Equations", difficulty:"intermediate", commandWord:"Solve",
+        skillTag:"gaussian-elimination", errorTag:"none",
+        stem: "Solve the system of equations using elimination or substitution:\n" + agFmtLinear(a1,0).replace(/\+ 0$/,"").trim() + "x " + agSignedStr(b1) + "y = " + c1 + "\n" + a2 + "x " + agSignedStr(b2) + "y = " + c2,
+        parts:[
+          { label:"a", text:"Eliminate one variable and form a single equation in one unknown.", marks:3, type:"self",
+            accepted:[], hint:"Multiply the equations by suitable constants so that the coefficients of one variable are equal in magnitude, then add or subtract.",
+            marking:["Correct multiplier chosen for at least one equation (1)","Equations correctly combined (1)","Single-variable equation correctly formed (1)"],
+            solution:"Multiply and combine the two equations to eliminate one variable; solving leads to y = " + yVal + "." },
+          { label:"b", text:"Hence, find the values of x and y.", marks:2, type:"expression",
+            accepted:[normaliseAnswer("x="+xVal+",y="+yVal), normaliseAnswer("("+xVal+","+yVal+")")],
+            hint:"Substitute the value found in part (a) back into either original equation.",
+            marking:["Correct value of one variable (1)","Correct value of the second variable (1)"],
+            solution:"Solving the system gives x = " + xVal + " and y = " + yVal + ". Check: " + a1 + "(" + xVal + ") " + agSignedStr(b1*yVal) + " = " + c1 + ". \u2713" }
+        ]
+      };
+    },
+    function tplMatrixOperations(){
+      const A = [[agRandInt(-5,5),agRandInt(-5,5)],[agRandInt(-5,5),agRandInt(-5,5)]];
+      const B = [[agRandInt(-5,5),agRandInt(-5,5)],[agRandInt(-5,5),agRandInt(-5,5)]];
+      const k = agRandNonZero(-4,4);
+      const sum = [[A[0][0]+B[0][0], A[0][1]+B[0][1]],[A[1][0]+B[1][0], A[1][1]+B[1][1]]];
+      const scaled = [[k*A[0][0], k*A[0][1]],[k*A[1][0], k*A[1][1]]];
+      const matStr = function(M){ return "[" + M[0][0] + " " + M[0][1] + "; " + M[1][0] + " " + M[1][1] + "]"; };
+      return {
+        topicId:"systems", subtopic:"Matrix Operations", difficulty:"basic", commandWord:"Compute",
+        skillTag:"matrix-operations", errorTag:"none",
+        stem: "Given A = " + matStr(A) + " and B = " + matStr(B) + ",",
+        parts:[
+          { label:"a", text:"Find A + B.", marks:2, type:"expression",
+            accepted:[normaliseAnswer(matStr(sum))],
+            hint:"Add corresponding entries of the two matrices.",
+            marking:["Top row correct (1)","Bottom row correct (1)"],
+            solution:"A + B = " + matStr(sum) + " (adding corresponding entries)." },
+          { label:"b", text:"Find " + k + "A.", marks:2, type:"expression",
+            accepted:[normaliseAnswer(matStr(scaled))],
+            hint:"Multiply every entry of A by " + k + ".",
+            marking:["Top row correct (1)","Bottom row correct (1)"],
+            solution: k + "A = " + matStr(scaled) + " (multiplying every entry by " + k + ")." }
+        ]
+      };
+    }
+  ]
+};
+
+/* ---------- Mark scaling to hit an exact required total ----------
+   Structured papers must total an exact number of marks (OBT presets
+   and the 70-mark Final Exam). We proportionally scale each part's
+   marks and correct any rounding drift on the final part so the
+   question total always matches the required target exactly. */
+function agRedistributeMarkingPoints(part){
+  const n = part.marking.length;
+  if(n === 0) return;
+  if(part.marks < n){
+    // Not enough marks to give each bullet its own point: combine into one line.
+    const combinedText = part.marking.map(function(t){ return t.replace(/\s*\(\d+\)\s*$/, ""); }).join("; ");
+    part.marking = [combinedText + " (total " + part.marks + " mark" + (part.marks===1?"":"s") + " for this part)"];
+    return;
+  }
+  const base = Math.floor(part.marks / n);
+  const remainder = part.marks - base * n;
+  part.marking = part.marking.map(function(text, idx){
+    const pts = base + (idx < remainder ? 1 : 0);
+    return text.replace(/\s*\(\d+\)\s*$/, "") + " (" + pts + ")";
+  });
+}
+
+function agScaleQuestionsToTarget(questions, targetTotal){
+  const rawTotal = questions.reduce(function(s,q){ return s + q.totalMarks; }, 0);
+  if(rawTotal === 0) return questions;
+  const scale = targetTotal / rawTotal;
+  let runningTotal = 0;
+  const lastQuestion = questions[questions.length-1];
+  const lastPart = lastQuestion.parts[lastQuestion.parts.length-1];
+  questions.forEach(function(q){
+    q.parts.forEach(function(part){
+      if(part === lastPart) return; // fix this one last, after summing the rest
+      part.marks = Math.max(1, Math.round(part.marks * scale));
+      runningTotal += part.marks;
+    });
+  });
+  lastPart.marks = Math.max(1, targetTotal - runningTotal);
+  questions.forEach(function(q){
+    q.parts.forEach(function(part){ agRedistributeMarkingPoints(part); });
+    q.totalMarks = q.parts.reduce(function(s,p){ return s + p.marks; }, 0);
+  });
+  return questions;
+}
+
+/* ---------- Generation engine ---------- */
+let AG_LAST_SIGNATURE = null;
+
+function agGenerateQuestion(topicId){
+  const templates = AG_TEMPLATES[topicId];
+  const fn = templates[agRandInt(0, templates.length-1)];
+  const q = fn();
+  q.id = "ag-" + topicId + "-" + Date.now() + "-" + agRandInt(1000,9999);
+  q.totalMarks = q.parts.reduce(function(s,p){ return s + p.marks; }, 0);
+  return q;
+}
+
+function agSignature(questions){
+  return questions.map(function(q){ return q.stem; }).join("|");
+}
+
+function agGenerateTopicQuiz(topicId, count, difficultyFilter){
+  let attempts = 0;
+  let questions;
+  do{
+    questions = [];
+    for(let i=0;i<count;i++){ questions.push(agGenerateQuestion(topicId)); }
+    attempts++;
+  } while(agSignature(questions) === AG_LAST_SIGNATURE && attempts < 5);
+  AG_LAST_SIGNATURE = agSignature(questions);
+  const totalMarks = questions.reduce(function(s,q){ return s + q.totalMarks; }, 0);
+  return { questions: questions, totalMarks: totalMarks };
+}
+
+const AG_OBT_PRESETS = {
+  "Short OBT": { count:3, marks:20, minutes:30 },
+  "Standard OBT": { count:5, marks:30, minutes:45 },
+  "Extended OBT": { count:6, marks:40, minutes:60 }
+};
+
+function agGenerateOBT(topicIds, presetName){
+  const preset = AG_OBT_PRESETS[presetName];
+  const questions = [];
+  for(let i=0;i<preset.count;i++){
+    const topicId = topicIds[i % topicIds.length];
+    questions.push(agGenerateQuestion(topicId));
+  }
+  agScaleQuestionsToTarget(questions, preset.marks);
+  const totalMarks = questions.reduce(function(s,q){ return s + q.totalMarks; }, 0);
+  return { questions: questions, totalMarks: totalMarks, durationMinutes: preset.minutes, targetMarks: preset.marks };
+}
+
+const AG_FINAL_EXAM_TOPIC_ORDER = ["algebra","functions","functions","polynomial","explog","trig","systems"];
+function agGenerateFinalExam(){
+  const questions = AG_FINAL_EXAM_TOPIC_ORDER.map(function(topicId){ return agGenerateQuestion(topicId); });
+  agScaleQuestionsToTarget(questions, 70);
+  const totalMarks = questions.reduce(function(s,q){ return s + q.totalMarks; }, 0);
+  return { questions: questions, totalMarks: totalMarks };
+}
+
+/* ============================================================
    MTCF 0114 Personalized Mathematics Learning Hub
    Centre for Foundation Studies, IIUM
    Vanilla JS single-page application logic
@@ -899,7 +1417,8 @@ function defaultData(){
     studyPlan: null, // {examDate, days[], minutesPerSession, topics[], sessions:[{id,date,topic,minutes,done}]}
     recentActivity: [], // [{date, text}]
     settings: { pathwayOverride: null },
-    companionLog: []
+    companionLog: [],
+    assessmentRecords: [] // [{id, kind:'quiz'|'obt'|'final', meta, topics, questions, responses, flags, startTime, elapsedSeconds, durationSeconds, timed, mode, status:'draft'|'submitted', score, totalMarks, chapterPerf, skillPerf, selfMarked, date, recommendedRevision}]
   };
 }
 
@@ -1000,6 +1519,7 @@ const NAV_ITEMS = [
   {id:"practice", label:"Practice Zone"},
   {id:"errorclinic", label:"Common Error Clinic"},
   {id:"assessprep", label:"Assessment Preparation"},
+  {id:"assessgen", label:"Assessment Generator"},
   {id:"progress", label:"My Progress"},
   {id:"planner", label:"Study Planner"},
   {id:"companion", label:"Learning Companion"},
@@ -1009,16 +1529,45 @@ const NAV_ITEMS = [
 
 function renderNav(){
   const ul = qs("#mainNavList");
-  ul.innerHTML = "";
-  NAV_ITEMS.forEach(function(item){
-    const li = document.createElement("li");
-    const btn = el("button", {
-      class: "nav-btn" + (appState.currentPage === item.id ? " active" : ""),
-      "aria-current": appState.currentPage === item.id ? "page" : "false",
-      onclick: function(){ showPage(item.id); closeMobileNav(); }
-    }, [item.label]);
-    li.appendChild(btn);
-    ul.appendChild(li);
+  if(ul.dataset.built !== "1"){
+    // Build the nav buttons ONCE. Rebuilding this subtree on every navigation
+    // (even though NAV_ITEMS never changes) caused a sticky-header hit-testing
+    // desync in some browsers where real pointer clicks would land on the
+    // parent <ul> instead of the intended button. Updating in place avoids it.
+    ul.innerHTML = "";
+    NAV_ITEMS.forEach(function(item){
+      const li = document.createElement("li");
+      const btn = el("button", {
+        class: "nav-btn",
+        "data-page-id": item.id,
+        "aria-current": "false",
+        onclick: function(){ showPage(item.id); closeMobileNav(); }
+      }, [item.label]);
+      li.appendChild(btn);
+      ul.appendChild(li);
+    });
+    ul.dataset.built = "1";
+    // Defensive fallback: if a real click's event.target resolves to the <ul>
+    // (or any non-button element) rather than the intended nav button -- a rare
+    // browser hit-testing edge case -- geometrically find and activate whichever
+    // button's rectangle contains the click point, so the click is never lost.
+    ul.addEventListener("click", function(ev){
+      if(ev.target && ev.target.closest && ev.target.closest(".nav-btn")) return; // already handled by the button's own listener
+      const x = ev.clientX, y = ev.clientY;
+      const candidate = qsa(".nav-btn", ul).find(function(btn){
+        const r = btn.getBoundingClientRect();
+        return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+      });
+      if(candidate){
+        const pageId = candidate.getAttribute("data-page-id");
+        if(pageId){ showPage(pageId); closeMobileNav(); }
+      }
+    });
+  }
+  qsa(".nav-btn", ul).forEach(function(btn){
+    const isActive = btn.getAttribute("data-page-id") === appState.currentPage;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-current", isActive ? "page" : "false");
   });
   const chip = qs("#headerStudentChip");
   if(appState.data && appState.data.profile){
@@ -1053,6 +1602,7 @@ function showPage(pageId, params){
     case "practice": renderPracticeSetup(); break;
     case "errorclinic": renderErrorClinic(); break;
     case "assessprep": renderAssessmentPrep(); break;
+    case "assessgen": renderAssessmentGenerator(); break;
     case "progress": renderProgressDashboard(); break;
     case "planner": renderStudyPlan(); break;
     case "companion": renderLearningCompanion(); break;
@@ -1060,8 +1610,8 @@ function showPage(pageId, params){
     case "help": renderHelp(); break;
     default: renderHome();
   }
-  app.focus();
-  window.scrollTo(0,0);
+  app.focus({preventScroll:true});
+  window.scrollTo({top:0, left:0, behavior:"auto"});
 }
 
 /* ---------- Onboarding ---------- */
@@ -2531,6 +3081,26 @@ function renderProgressDashboard(){
   else { actCard.appendChild(actList); }
   app.appendChild(actCard);
 
+  // Assessment Generator history
+  const agHistCard = el("div",{class:"card"});
+  agHistCard.appendChild(el("h3",{},["Assessment History (Assessment Generator)"]));
+  const agRecords = appState.data.assessmentRecords || [];
+  const agSubmitted = agRecords.filter(function(r){ return r.status === "submitted"; });
+  if(agSubmitted.length === 0){
+    agHistCard.appendChild(el("p",{class:"topnote"},["No Mock Topic Quizzes, Mock OBTs or Mock Final Examinations completed yet."]));
+  } else {
+    const avgPercent = Math.round(agSubmitted.reduce(function(s,r){ return s + pct(r.score,r.totalMarks); },0) / agSubmitted.length);
+    agHistCard.appendChild(el("p",{},["Average score across " + agSubmitted.length + " completed paper(s): " + avgPercent + "%"]));
+    const agTable = el("table",{class:"data-table"});
+    agTable.appendChild(el("tr",{},[el("th",{},["Paper"]),el("th",{},["Date"]),el("th",{},["Score"])]));
+    agSubmitted.slice(0,8).forEach(function(r){
+      agTable.appendChild(el("tr",{},[el("td",{},[r.meta.title]),el("td",{},[formatDate(r.startTime)]),el("td",{},[r.score+" / "+r.totalMarks+" ("+pct(r.score,r.totalMarks)+"%)"])]));
+    });
+    agHistCard.appendChild(agTable);
+  }
+  agHistCard.appendChild(el("div",{class:"btn-row"},[el("button",{class:"btn small outline", onclick:function(){ appState.assessGenView="records"; showPage("assessgen"); }},["Open Assessment Generator"])]));
+  app.appendChild(agHistCard);
+
   // Recommended next step
   const rec = recommendNextActivity();
   const recCard = el("div",{class:"card"});
@@ -2867,6 +3437,46 @@ function renderTeacherDashboard(){
   }
   app.appendChild(planCard);
 
+  const agTeacherCard = el("div",{class:"card"});
+  agTeacherCard.appendChild(el("h3",{},["Assessment Generator Records"]));
+  const agRecords = appState.data.assessmentRecords || [];
+  if(agRecords.length === 0){
+    agTeacherCard.appendChild(el("p",{class:"topnote"},["No Mock Topic Quizzes, Mock OBTs or Mock Final Examinations generated yet on this device."]));
+  } else {
+    const agTable = el("table",{class:"data-table"});
+    agTable.appendChild(el("tr",{},[el("th",{},["Type"]),el("th",{},["Title"]),el("th",{},["Attempt Date"]),el("th",{},["Duration"]),el("th",{},["Status"]),el("th",{},["Score"]),el("th",{},["Readiness"]),el("th",{},["Actions"])]));
+    agRecords.forEach(function(r){
+      const kindLabel = r.kind === "quiz" ? "Mock Topic Quiz" : (r.kind === "obt" ? "Mock OBT" : "Mock Final Examination");
+      const duration = r.meta.durationMinutes ? (r.meta.durationMinutes + " min") : "Untimed";
+      const selfMarkedParts = r.status === "submitted" ? r.questions.reduce(function(sum,q){ return sum + q.parts.filter(function(p){return p.type==="self";}).length; },0) : 0;
+      const actionsCell = el("td",{});
+      actionsCell.appendChild(el("button",{class:"btn small", onclick:function(){ r.status==="draft" ? renderAGRunnerPage(r.id) : renderAGResults(r.id); }},["View Paper"]));
+      if(r.status === "submitted"){
+        actionsCell.appendChild(el("button",{class:"btn small outline", style:"margin-left:6px;", onclick:function(){ renderAGResults(r.id); }},["View Responses"]));
+      }
+      actionsCell.appendChild(el("button",{class:"btn small outline", style:"margin-left:6px;", onclick:function(){ printAGMarkingScheme(r); }},["View/Print Marking Scheme"]));
+      actionsCell.appendChild(el("button",{class:"btn small outline", style:"margin-left:6px;", onclick:function(){ printAGQuestionPaper(r); }},["Print Report"]));
+      if(r.status === "submitted"){
+        actionsCell.appendChild(el("button",{class:"btn small outline", style:"margin-left:6px;", onclick:function(){ exportAGResultsToCSV(r); }},["Export CSV"]));
+      }
+      agTable.appendChild(el("tr",{},[
+        el("td",{},[kindLabel]),
+        el("td",{},[r.meta.title]),
+        el("td",{},[formatDate(r.startTime)]),
+        el("td",{},[duration]),
+        el("td",{},[r.status === "draft" ? "Draft (in progress)" : "Completed"]),
+        el("td",{},[r.status === "submitted" ? (r.score + " / " + r.totalMarks + (selfMarkedParts>0 ? " (incl. " + selfMarkedParts + " self-assessed)" : "")) : "\u2014"]),
+        el("td",{},[r.status === "submitted" ? agReadinessMessage(r.topics).level : "\u2014"]),
+        actionsCell
+      ]));
+    });
+    agTeacherCard.appendChild(agTable);
+    agTeacherCard.appendChild(el("div",{class:"btn-row"},[
+      el("button",{class:"btn small danger", onclick:function(){ openAGClearAllConfirm(function(){ renderTeacherDashboard(); }); }},["Clear Assessment Records"])
+    ]));
+  }
+  app.appendChild(agTeacherCard);
+
   const actionsCard = el("div",{class:"card no-print"});
   actionsCard.appendChild(el("h3",{},["Actions"]));
   actionsCard.appendChild(el("div",{class:"btn-row"},[
@@ -2945,6 +3555,745 @@ function initializeApp(){
 }
 
 document.addEventListener("DOMContentLoaded", initializeApp);
+
+/* ============================================================
+   MTCF 0114 ASSESSMENT GENERATOR - UI, Session Runner, Marking,
+   Printing, Export, Teacher View & Progress Integration
+   ============================================================ */
+
+appState.assessGenView = "quiz"; // 'quiz' | 'obt' | 'final' | 'records'
+appState.assessGenSession = null; // { recordId, currentIndex }
+
+function agTopicList(){ return TOPICS; }
+function agFindRecord(id){ return appState.data.assessmentRecords.find(function(r){ return r.id === id; }); }
+function agUpsertRecord(record){
+  const idx = appState.data.assessmentRecords.findIndex(function(r){ return r.id === record.id; });
+  if(idx === -1) appState.data.assessmentRecords.unshift(record);
+  else appState.data.assessmentRecords[idx] = record;
+  saveStudentData();
+}
+function agNewRecordId(kind){ return "arec-" + kind + "-" + Date.now() + "-" + agRandInt(1000,9999); }
+
+/* ---------- Readiness message ---------- */
+function agReadinessMessage(topicIds){
+  const ids = (topicIds && topicIds.length) ? topicIds : TOPICS.map(function(t){return t.id;});
+  let haveMastery = 0, strong = 0, sumPct = 0, countPct = 0;
+  ids.forEach(function(id){
+    const m = appState.data.mastery[id];
+    const d = appState.data.diagnostic[id];
+    if(m){ haveMastery++; sumPct += m.percent; countPct++; if(m.percent >= 75) strong++; }
+    else if(d){ sumPct += d.percent; countPct++; }
+  });
+  if(haveMastery < Math.ceil(ids.length/2)){
+    return { level:"warning", text:"Complete Topic Mastery Checks First \u2014 you have completed mastery checks for only " + haveMastery + " of " + ids.length + " relevant topic(s). This is advisory only; you may still continue." };
+  }
+  const avg = countPct ? Math.round(sumPct/countPct) : 0;
+  if(strong === ids.length || avg >= 80){
+    return { level:"success", text:"Ready for Mock Final \u2014 your recent mastery and diagnostic scores average " + avg + "%. This is advisory only; you may still continue at any time." };
+  }
+  return { level:"caution", text:"Additional Revision Recommended \u2014 your average recent score is " + avg + "%. Consider reviewing weaker topics before attempting a full assessment. This is advisory only; you may still continue." };
+}
+function agReadinessBox(topicIds){
+  const r = agReadinessMessage(topicIds);
+  const cls = r.level === "success" ? "correct" : (r.level === "warning" ? "incorrect" : "correct");
+  return el("div",{class:"feedback-box "+cls},[r.text]);
+}
+
+/* ============================================================
+   MAIN PAGE: TAB SWITCHER
+   ============================================================ */
+function renderAssessmentGenerator(){
+  const app = qs("#app");
+  app.appendChild(pageNavRow());
+  const card = el("div",{class:"card"});
+  card.appendChild(el("h2",{},["Assessment Generator"]));
+  card.appendChild(el("p",{},["Generate fresh, randomised structured-question papers for revision or timed practice. Every generated paper uses new values \u2014 questions are never copied word-for-word from any reference material."]));
+  const tabs = el("div",{class:"tag-select"});
+  [["quiz","Mock Topic Quiz"],["obt","Mock OBT"],["final","Mock Final Examination"],["records","My Assessment Records"]].forEach(function(t){
+    tabs.appendChild(el("button",{type:"button", class: appState.assessGenView===t[0] ? "selected":"", onclick:function(){ appState.assessGenView = t[0]; showPage("assessgen"); }},[t[1]]));
+  });
+  card.appendChild(tabs);
+  app.appendChild(card);
+
+  if(appState.assessGenView === "quiz") renderAGQuizSetup();
+  else if(appState.assessGenView === "obt") renderAGObtSetup();
+  else if(appState.assessGenView === "final") renderAGFinalSetup();
+  else renderAGRecordsList();
+}
+
+/* ============================================================
+   MODULE 1: MOCK TOPIC QUIZ
+   ============================================================ */
+function renderAGQuizSetup(){
+  const app = qs("#app");
+  const card = el("div",{class:"card"});
+  card.appendChild(el("h3",{},["Mock Topic Quiz"]));
+  card.appendChild(el("p",{class:"topnote"},["Structured, examination-style questions for one chapter at a time. Each question includes numbered subparts with individual mark allocations."]));
+
+  const form = el("form",{id:"agQuizForm"});
+  form.appendChild(fieldSelect("agqTopic","Chapter", agTopicList().map(function(t){return t.name;})));
+  form.appendChild(fieldOptionCards("agqDifficulty","Difficulty",["Basic","Intermediate","Assessment Level","Challenge","Mixed"]));
+  form.appendChild(fieldOptionCards("agqCount","Number of Questions",["3","5","7","10"]));
+  form.appendChild(fieldOptionCards("agqTiming","Timing",["Untimed","Timed"]));
+  form.appendChild(fieldOptionCards("agqMode","Mode",["Practice Mode (hints + feedback per question)","Assessment Mode (no hints, feedback at the end)"]));
+  form.appendChild(fieldOptionCards("agqHints","Hints Available (Practice Mode only)",["Yes","No"]));
+  form.appendChild(el("div",{class:"btn-row"},[el("button",{type:"submit",class:"btn gold"},["Generate Mock Topic Quiz"])]));
+
+  form.addEventListener("submit", function(ev){
+    ev.preventDefault();
+    const topicName = qs("#agqTopic",form).value;
+    const topic = TOPICS.find(function(t){return t.name===topicName;});
+    const difficulty = getSelectedOption(form,"agqDifficulty") || "Mixed";
+    const count = parseInt(getSelectedOption(form,"agqCount")||"5",10);
+    const timed = getSelectedOption(form,"agqTiming") === "Timed";
+    const assessmentMode = (getSelectedOption(form,"agqMode")||"").indexOf("Assessment") === 0;
+    const hintsAvailable = !assessmentMode && (getSelectedOption(form,"agqHints") === "Yes");
+    startAGQuiz(topic.id, count, difficulty, timed, assessmentMode, hintsAvailable);
+  });
+  card.appendChild(form);
+  card.appendChild(el("h4",{},["Readiness Check"]));
+  card.appendChild(agReadinessBox(null));
+  app.appendChild(card);
+}
+
+function startAGQuiz(topicId, count, difficulty, timed, assessmentMode, hintsAvailable){
+  const gen = agGenerateTopicQuiz(topicId, count, difficulty);
+  const record = {
+    id: agNewRecordId("quiz"), kind:"quiz", topics:[topicId],
+    meta:{ title:"Mock Topic Quiz \u2014 " + getTopic(topicId).name, difficulty:difficulty, timed:timed, mode: assessmentMode?"Assessment Mode":"Practice Mode", hintsAvailable:hintsAvailable, durationMinutes: Math.ceil(count*4) },
+    questions: gen.questions, totalMarks: gen.totalMarks,
+    responses:{}, flags:{}, startTime:new Date().toISOString(), elapsedSeconds:0,
+    durationSeconds: timed ? count*4*60 : null, status:"draft"
+  };
+  agUpsertRecord(record);
+  appState.assessGenSession = { recordId: record.id, currentIndex: 0 };
+  logActivity("Generated a Mock Topic Quiz for " + getTopic(topicId).name);
+  renderAGRunnerPage(record.id);
+}
+
+/* ============================================================
+   MODULE 2: MOCK OBT
+   ============================================================ */
+function renderAGObtSetup(){
+  const app = qs("#app");
+  const card = el("div",{class:"card"});
+  card.appendChild(el("h3",{},["Mock OBT (Open Book Test)"]));
+  card.appendChild(el("p",{class:"topnote"},["Select one or more chapters, then choose a preset. Hints and solutions are hidden until you submit."]));
+
+  const form = el("form",{id:"agObtForm"});
+  const topicWrap = el("div",{class:"formfield"});
+  topicWrap.appendChild(el("label",{},["Chapters to include"]));
+  const tagRow = el("div",{class:"tag-select", id:"agObtTopicsTag"});
+  const selected = {};
+  agTopicList().forEach(function(t, i){
+    if(i===0) selected[t.id] = true;
+    tagRow.appendChild(el("button",{type:"button", class: i===0 ? "selected":"", "data-topic":t.id, onclick:function(ev){
+      selected[t.id] = !selected[t.id];
+      ev.currentTarget.classList.toggle("selected");
+    }},[t.name]));
+  });
+  topicWrap.appendChild(tagRow);
+  form.appendChild(topicWrap);
+
+  form.appendChild(fieldOptionCards("agoPreset","Preset",["Short OBT","Standard OBT","Extended OBT"]));
+  const presetInfo = el("div",{class:"topnote"},["Short OBT: 3 questions, 20 marks, 30 minutes. Standard OBT: 5 questions, 30 marks, 45 minutes. Extended OBT: 6 questions, 40 marks, 60 minutes."]);
+  form.appendChild(presetInfo);
+  form.appendChild(el("div",{class:"btn-row"},[el("button",{type:"submit",class:"btn gold"},["Generate Mock OBT"])]));
+
+  form.addEventListener("submit", function(ev){
+    ev.preventDefault();
+    const chosenTopics = agTopicList().filter(function(t){return selected[t.id];}).map(function(t){return t.id;});
+    if(chosenTopics.length===0){ alert("Please select at least one chapter."); return; }
+    const preset = getSelectedOption(form,"agoPreset") || "Standard OBT";
+    startAGObt(chosenTopics, preset);
+  });
+  card.appendChild(form);
+  card.appendChild(el("h4",{},["Readiness Check"]));
+  card.appendChild(agReadinessBox(Object.keys(selected).filter(function(k){return selected[k];})));
+  app.appendChild(card);
+}
+
+function startAGObt(topicIds, presetName){
+  const gen = agGenerateOBT(topicIds, presetName);
+  const p = appState.data.profile;
+  const record = {
+    id: agNewRecordId("obt"), kind:"obt", topics: topicIds,
+    meta:{ title:"Mock OBT \u2014 " + presetName, presetName: presetName, studentName:p.name, studentSection:p.section,
+           dateGenerated:new Date().toISOString(), durationMinutes: AG_OBT_PRESETS[presetName].minutes,
+           instructions:"Answer ALL questions. Show all working clearly. You may refer to your notes and textbook. Calculators are not permitted unless stated otherwise." },
+    questions: gen.questions, totalMarks: gen.totalMarks,
+    responses:{}, flags:{}, startTime:new Date().toISOString(), elapsedSeconds:0,
+    durationSeconds: AG_OBT_PRESETS[presetName].minutes*60, status:"draft"
+  };
+  agUpsertRecord(record);
+  appState.assessGenSession = { recordId: record.id, currentIndex: 0 };
+  logActivity("Generated a Mock OBT (" + presetName + ") covering " + topicIds.length + " chapter(s)");
+  renderAGRunnerPage(record.id);
+}
+
+/* ============================================================
+   MODULE 3: MOCK FINAL EXAMINATION
+   ============================================================ */
+function renderAGFinalSetup(){
+  const app = qs("#app");
+  const card = el("div",{class:"card"});
+  card.appendChild(el("h3",{},["Mock Final Examination"]));
+  card.appendChild(el("p",{class:"topnote"},["7 compulsory structured questions covering the complete MTCF 0114 syllabus, totalling 70 marks, in the style of the end-of-semester examination."]));
+  card.appendChild(el("div",{class:"feedback-box incorrect"},[
+    el("strong",{},["FOR PRACTICE PURPOSES ONLY \u2014 NOT AN OFFICIAL IIUM EXAMINATION PAPER."])
+  ]));
+  card.appendChild(el("h4",{},["Readiness Check"]));
+  card.appendChild(agReadinessBox(null));
+
+  const form = el("form",{id:"agFinalForm"});
+  form.appendChild(fieldOptionCards("agfTiming","Timing",["Timed (120 minutes, recommended)","Untimed"]));
+  form.appendChild(el("div",{class:"btn-row"},[el("button",{type:"submit",class:"btn gold"},["Generate Mock Final Examination"])]));
+  form.addEventListener("submit", function(ev){
+    ev.preventDefault();
+    const timed = getSelectedOption(form,"agfTiming") !== "Untimed";
+    startAGFinal(timed);
+  });
+  card.appendChild(form);
+  app.appendChild(card);
+}
+
+function startAGFinal(timed){
+  const gen = agGenerateFinalExam();
+  const p = appState.data.profile;
+  const record = {
+    id: agNewRecordId("final"), kind:"final", topics: TOPICS.map(function(t){return t.id;}),
+    meta:{ title:"MTCF 0114 Mock Final Examination", studentName:p.name, studentSection:p.section,
+           dateGenerated:new Date().toISOString(), durationMinutes: 120,
+           instructions:"Answer ALL 7 questions. All questions carry the marks shown. Show complete working for method marks.",
+           notice:"FOR PRACTICE PURPOSES ONLY \u2014 NOT AN OFFICIAL IIUM EXAMINATION PAPER" },
+    questions: gen.questions, totalMarks: gen.totalMarks,
+    responses:{}, flags:{}, startTime:new Date().toISOString(), elapsedSeconds:0,
+    durationSeconds: timed ? 120*60 : null, status:"draft"
+  };
+  agUpsertRecord(record);
+  appState.assessGenSession = { recordId: record.id, currentIndex: 0 };
+  logActivity("Generated a Mock Final Examination (" + gen.totalMarks + " marks)");
+  renderAGRunnerPage(record.id);
+}
+
+/* ============================================================
+   SESSION RUNNER (answering, timer, autosave, palette, flags)
+   ============================================================ */
+let agSaveTimeout = null;
+function agAutosave(record){
+  clearTimeout(agSaveTimeout);
+  agSaveTimeout = setTimeout(function(){ agUpsertRecord(record); }, 400);
+}
+function agGetResponse(record, qIndex, label){
+  record.responses[qIndex] = record.responses[qIndex] || {};
+  record.responses[qIndex][label] = record.responses[qIndex][label] || { answer:"", working:"", selfChecks:{} };
+  return record.responses[qIndex][label];
+}
+function agQuestionAnswered(record, qIndex){
+  const q = record.questions[qIndex];
+  const responses = record.responses[qIndex];
+  if(!responses) return false;
+  return q.parts.some(function(p){
+    const r = responses[p.label];
+    if(!r) return false;
+    if(p.type === "self") return r.selfChecks && Object.keys(r.selfChecks).some(function(k){ return r.selfChecks[k]; });
+    return r.answer && r.answer.trim().length > 0;
+  });
+}
+
+function renderAGRunnerPage(recordId){
+  clearInterval(appState.timerInterval);
+  const record = agFindRecord(recordId);
+  const app = qs("#app");
+  app.innerHTML = "";
+  if(!record){ app.appendChild(el("div",{class:"card"},[el("p",{},["Assessment record not found."])])); return; }
+  if(record.status === "submitted"){ renderAGResults(recordId); return; }
+
+  appState.assessGenSession = appState.assessGenSession && appState.assessGenSession.recordId === recordId ? appState.assessGenSession : { recordId: recordId, currentIndex: 0 };
+
+  const card = el("div",{class:"card", id:"agRunnerCard"});
+  app.appendChild(card);
+
+  // Header block
+  card.appendChild(el("h2",{},[record.meta.title]));
+  const p = appState.data.profile;
+  const infoLine = "Student: " + p.name + " | Section: " + p.section + " | Date: " + formatDate(record.startTime) + " | Total Marks: " + record.totalMarks + (record.meta.durationMinutes ? " | Duration: " + record.meta.durationMinutes + " minutes" : "");
+  card.appendChild(el("p",{class:"topnote"},[infoLine]));
+  if(record.meta.instructions){ card.appendChild(el("div",{class:"formula"},[record.meta.instructions])); }
+  if(record.meta.notice){ card.appendChild(el("div",{class:"feedback-box incorrect"},[el("strong",{},[record.meta.notice])])); }
+
+  if(record.durationSeconds !== null && record.durationSeconds !== undefined){
+    const remaining = Math.max(0, record.durationSeconds - (record.elapsedSeconds||0));
+    card.appendChild(el("span",{id:"agTimer", class:"timer-display"},[formatTimer(remaining)]));
+    clearInterval(appState.timerInterval);
+    appState.timerInterval = setInterval(function(){
+      record.elapsedSeconds = (record.elapsedSeconds||0) + 1;
+      const rem = record.durationSeconds - record.elapsedSeconds;
+      const t = qs("#agTimer");
+      if(t) t.textContent = formatTimer(rem);
+      if(record.elapsedSeconds % 10 === 0) agUpsertRecord(record);
+      if(rem <= 0){
+        clearInterval(appState.timerInterval);
+        agUpsertRecord(record);
+        agSubmitRecord(record);
+        renderAGRunnerPage(recordId);
+      }
+    }, 1000);
+  }
+
+  // Question palette
+  const paletteWrap = el("div",{class:"card", style:"background:#fbfdfd;"});
+  paletteWrap.appendChild(el("p",{class:"topnote"},["Question palette \u2014 green: answered, gold border: flagged for review"]));
+  const palette = el("div",{class:"option-grid"});
+  record.questions.forEach(function(q, i){
+    const answered = agQuestionAnswered(record, i);
+    const flagged = !!record.flags[i];
+    const isCurrent = appState.assessGenSession.currentIndex === i;
+    palette.appendChild(el("button",{type:"button",
+      class:"option-card" + (isCurrent?" selected":""),
+      style: (answered ? "background:#e7f6ea;" : "") + (flagged ? "border-color:var(--gold); border-width:3px;" : ""),
+      onclick:function(){ appState.assessGenSession.currentIndex = i; renderAGRunnerPage(recordId); }
+    },["Q" + (i+1) + (flagged?" \u2691":"") + (answered?" \u2713":"")]));
+  });
+  paletteWrap.appendChild(palette);
+  card.appendChild(paletteWrap);
+
+  const qContainer = el("div",{id:"agQuestionContainer"});
+  card.appendChild(qContainer);
+  renderAGQuestionBlock(record, appState.assessGenSession.currentIndex, qContainer);
+
+  // Navigation and actions
+  const navRow = el("div",{class:"btn-row"});
+  navRow.appendChild(el("button",{class:"btn small outline", onclick:function(){
+    appState.assessGenSession.currentIndex = Math.max(0, appState.assessGenSession.currentIndex-1); renderAGRunnerPage(recordId);
+  }},["\u2190 Previous Question"]));
+  navRow.appendChild(el("button",{class:"btn small outline", onclick:function(){
+    appState.assessGenSession.currentIndex = Math.min(record.questions.length-1, appState.assessGenSession.currentIndex+1); renderAGRunnerPage(recordId);
+  }},["Next Question \u2192"]));
+  navRow.appendChild(el("button",{class:"btn small gold", onclick:function(){
+    record.flags[appState.assessGenSession.currentIndex] = !record.flags[appState.assessGenSession.currentIndex];
+    agUpsertRecord(record);
+    renderAGRunnerPage(recordId);
+  }},[record.flags[appState.assessGenSession.currentIndex] ? "Unflag This Question" : "Flag for Review"]));
+  card.appendChild(navRow);
+
+  const actionRow = el("div",{class:"btn-row"});
+  actionRow.appendChild(el("button",{class:"btn small outline", onclick:function(){ agUpsertRecord(record); alert("Draft saved."); }},["Save Draft"]));
+  actionRow.appendChild(el("button",{class:"btn", onclick:function(){ openAGSubmitConfirm(record); }},["Submit Assessment"]));
+  actionRow.appendChild(el("button",{class:"btn small outline", onclick:function(){ printAGQuestionPaper(record); }},["Print Question Paper"]));
+  actionRow.appendChild(el("button",{class:"btn small outline", onclick:function(){ appState.assessGenView = record.kind==="quiz"?"quiz":(record.kind==="obt"?"obt":(record.kind==="final"?"final":"records")); showPage("assessgen"); }},["Generate New Paper"]));
+  card.appendChild(actionRow);
+}
+
+function renderAGQuestionBlock(record, qIndex, container){
+  container.innerHTML = "";
+  const q = record.questions[qIndex];
+  const hintsOn = record.meta.hintsAvailable && record.meta.mode === "Practice Mode";
+  container.appendChild(el("p",{class:"topnote"},["Question " + (qIndex+1) + " of " + record.questions.length + " \u2014 " + getTopic(q.topicId).name + " (" + q.subtopic + ") \u2014 " + q.totalMarks + " marks"]));
+  container.appendChild(el("p",{},[el("strong",{},[q.commandWord + ": "]), q.stem]));
+
+  q.parts.forEach(function(part){
+    const resp = agGetResponse(record, qIndex, part.label);
+    const partBox = el("div",{class:"card", style:"margin-bottom:12px; background:#fbfdfd;"});
+    partBox.appendChild(el("p",{},[el("strong",{},["(" + part.label + ") "]), part.text, el("span",{class:"pill"},["[" + part.marks + " mark" + (part.marks===1?"":"s") + "]"])]));
+
+    const workingLabel = el("label",{style:"font-size:12.5px;font-weight:600;"},["Working (optional space for your method)"]);
+    const workingArea = el("textarea",{rows:"3", "aria-label":"Working for part " + part.label});
+    workingArea.value = resp.working || "";
+    workingArea.addEventListener("input", function(){ resp.working = workingArea.value; agAutosave(record); });
+    partBox.appendChild(workingLabel);
+    partBox.appendChild(workingArea);
+
+    if(part.type === "self"){
+      partBox.appendChild(el("p",{class:"topnote"},["Tick each step once you have completed it correctly. This part is self-assessed."]));
+      part.marking.forEach(function(stepText, si){
+        const rowWrap = el("label",{style:"display:block; margin:4px 0; font-size:13.5px;"});
+        const cb = el("input",{type:"checkbox"});
+        cb.checked = !!(resp.selfChecks && resp.selfChecks[si]);
+        cb.addEventListener("change", function(){ resp.selfChecks = resp.selfChecks || {}; resp.selfChecks[si] = cb.checked; agAutosave(record); });
+        rowWrap.appendChild(cb);
+        rowWrap.appendChild(document.createTextNode(" " + stepText));
+        partBox.appendChild(rowWrap);
+      });
+    } else {
+      const answerLabel = el("label",{style:"font-size:12.5px;font-weight:600;"},["Final Answer"]);
+      const answerInput = el("input",{type:"text", "aria-label":"Final answer for part " + part.label});
+      answerInput.value = resp.answer || "";
+      answerInput.addEventListener("input", function(){ resp.answer = answerInput.value; agAutosave(record); });
+      partBox.appendChild(answerLabel);
+      partBox.appendChild(answerInput);
+    }
+
+    if(hintsOn && part.hint){
+      const hintBox = el("div",{class:"hint-content hidden"},[part.hint]);
+      partBox.appendChild(el("button",{type:"button", class:"hint-btn", onclick:function(){ hintBox.classList.toggle("hidden"); }},["Show Hint"]));
+      partBox.appendChild(hintBox);
+    }
+    container.appendChild(partBox);
+  });
+}
+
+function openAGSubmitConfirm(record){
+  const unanswered = record.questions.filter(function(q,i){ return !agQuestionAnswered(record,i); }).length;
+  const overlay = el("div",{class:"modal-overlay", onclick:function(ev){ if(ev.target===overlay) closeModal(); }});
+  const box = el("div",{class:"modal-box"});
+  box.appendChild(el("h2",{},["Submit Assessment?"]));
+  box.appendChild(el("p",{},[unanswered>0 ? ("You have " + unanswered + " unanswered question(s). Unanswered parts will be marked as incorrect.") : "All questions have at least one answered part."]));
+  box.appendChild(el("p",{},["Once submitted, your answers will be automatically marked (and self-marked where applicable) and you will see full solutions. This cannot be undone."]));
+  box.appendChild(el("div",{class:"btn-row"},[
+    el("button",{class:"btn gold", onclick:function(){ closeModal(); clearInterval(appState.timerInterval); agSubmitRecord(record); renderAGResults(record.id); }},["Yes, Submit Now"]),
+    el("button",{class:"btn outline", onclick:closeModal},["Cancel, Keep Working"])
+  ]));
+  overlay.appendChild(box);
+  qs("#modalRoot").appendChild(overlay);
+}
+
+/* ============================================================
+   MARKING (automatic + guided self-marking)
+   ============================================================ */
+function agSubmitRecord(record){
+  const chapterPerf = {}, skillPerf = {};
+  record.questions.forEach(function(q, qi){
+    chapterPerf[q.topicId] = chapterPerf[q.topicId] || { score:0, total:0 };
+    skillPerf[q.skillTag] = skillPerf[q.skillTag] || { score:0, total:0 };
+    q.parts.forEach(function(part){
+      const resp = agGetResponse(record, qi, part.label);
+      let awarded = 0, correct = false;
+      if(part.type === "self"){
+        const steps = part.marking.length;
+        const checkedCount = resp.selfChecks ? Object.keys(resp.selfChecks).filter(function(k){ return resp.selfChecks[k]; }).length : 0;
+        awarded = Math.round((checkedCount/steps) * part.marks);
+        correct = checkedCount === steps;
+        resp.selfMarked = true;
+      } else {
+        correct = answerMatches(resp.answer, part.accepted);
+        awarded = correct ? part.marks : 0;
+        resp.selfMarked = false;
+      }
+      resp.awarded = awarded;
+      resp.correct = correct;
+      chapterPerf[q.topicId].score += awarded;
+      chapterPerf[q.topicId].total += part.marks;
+      skillPerf[q.skillTag].score += awarded;
+      skillPerf[q.skillTag].total += part.marks;
+      recordPracticeAttempt(q.topicId, correct);
+      if(!correct && q.errorTag && q.errorTag !== "none") recordErrorCategory(q.errorTag);
+    });
+  });
+  record.chapterPerf = chapterPerf;
+  record.skillPerf = skillPerf;
+  record.score = Object.keys(chapterPerf).reduce(function(s,k){ return s + chapterPerf[k].score; }, 0);
+  record.status = "submitted";
+  record.submittedDate = new Date().toISOString();
+
+  let weakestTopic = null, weakestPct = 101;
+  Object.keys(chapterPerf).forEach(function(k){
+    const perc = pct(chapterPerf[k].score, chapterPerf[k].total);
+    if(perc < weakestPct){ weakestPct = perc; weakestTopic = k; }
+  });
+  record.recommendedRevision = weakestTopic ? (getTopic(weakestTopic).name + " (" + weakestPct + "% in this attempt)") : "General revision across all chapters";
+
+  agUpsertRecord(record);
+  logActivity("Submitted " + record.meta.title + ": " + record.score + "/" + record.totalMarks + " marks");
+  awardBadges();
+}
+
+/* ============================================================
+   RESULTS & PERSONALISED FEEDBACK
+   ============================================================ */
+function renderAGResults(recordId){
+  const record = agFindRecord(recordId);
+  const app = qs("#app");
+  app.appendChild(pageNavRow());
+  if(!record){ app.appendChild(el("div",{class:"card"},[el("p",{},["Assessment record not found."])])); return; }
+
+  const percent = pct(record.score, record.totalMarks);
+  const card = el("div",{class:"card"});
+  card.appendChild(el("h2",{},[record.meta.title + " \u2014 Result"]));
+  card.appendChild(el("p",{},["Total score: " + record.score + " / " + record.totalMarks + " (" + percent + "%)"]));
+  card.appendChild(el("div",{class:"progressbar-track"},[el("div",{class:"progressbar-fill", style:"width:"+percent+"%"},[])]));
+  card.appendChild(el("div",{class:"feedback-box correct"},["Recommended revision: " + record.recommendedRevision]));
+  app.appendChild(card);
+
+  const chapterCard = el("div",{class:"card"});
+  chapterCard.appendChild(el("h3",{},["Performance by Chapter"]));
+  Object.keys(record.chapterPerf).forEach(function(k){
+    const cp = record.chapterPerf[k];
+    const cpPct = pct(cp.score, cp.total);
+    const row = el("div",{style:"margin-bottom:10px;"});
+    row.appendChild(el("p",{class:"topnote"},[getTopic(k).name + ": " + cp.score + " / " + cp.total + " (" + cpPct + "%)"]));
+    row.appendChild(el("div",{class:"progressbar-track"},[el("div",{class:"progressbar-fill", style:"width:"+cpPct+"%"},[])]));
+    chapterCard.appendChild(row);
+  });
+  app.appendChild(chapterCard);
+
+  const skillCard = el("div",{class:"card"});
+  skillCard.appendChild(el("h3",{},["Performance by Skill"]));
+  const skillList = el("ul",{class:"error-list"});
+  Object.keys(record.skillPerf).forEach(function(k){
+    const sp = record.skillPerf[k];
+    skillList.appendChild(el("li",{},[el("span",{},[k.replace(/-/g," ")]), el("span",{},[sp.score + "/" + sp.total])]));
+  });
+  skillCard.appendChild(skillList);
+  app.appendChild(skillCard);
+
+  const detailCard = el("div",{class:"card"});
+  detailCard.appendChild(el("h3",{},["Full Review, Worked Solutions and Marking Scheme"]));
+  record.questions.forEach(function(q, qi){
+    const qBox = el("div",{class:"card", style:"margin-bottom:14px; background:#fbfdfd;"});
+    qBox.appendChild(el("h4",{},["Question " + (qi+1) + " \u2014 " + getTopic(q.topicId).name + " (" + q.subtopic + ") \u2014 " + q.totalMarks + " marks"]));
+    qBox.appendChild(el("p",{},[q.stem]));
+    q.parts.forEach(function(part){
+      const resp = agGetResponse(record, qi, part.label);
+      const pBox = el("div",{class:"step"});
+      pBox.appendChild(el("p",{},[el("strong",{},["(" + part.label + ") " + part.text + " [" + part.marks + " mark(s)]"])]));
+      if(part.type === "self"){
+        pBox.appendChild(el("p",{},[el("strong",{},["STUDENT SELF-ASSESSED"]), " \u2014 marks awarded: " + resp.awarded + " / " + part.marks]));
+      } else {
+        pBox.appendChild(el("p",{},["Your answer: " + (resp.answer || "(no answer)") + " \u2014 " + (resp.correct ? "Correct" : "Incorrect") + " (" + resp.awarded + "/" + part.marks + ")"]));
+      }
+      const markUl = el("ul",{});
+      part.marking.forEach(function(m){ markUl.appendChild(el("li",{},[m])); });
+      pBox.appendChild(el("p",{class:"topnote"},["Marking scheme:"]));
+      pBox.appendChild(markUl);
+      pBox.appendChild(el("p",{},[el("strong",{},["Worked solution: "]), part.solution]));
+      qBox.appendChild(pBox);
+    });
+    // common mistake linkage
+    const topicObj = getTopic(q.topicId);
+    const matchedError = topicObj.commonErrors.find(function(e){ return e.id === q.errorTag; });
+    if(matchedError){
+      qBox.appendChild(el("div",{class:"wrong-method"},[el("strong",{},["Common mistake to watch for: "]), matchedError.title + " \u2014 " + matchedError.why]));
+    }
+    detailCard.appendChild(qBox);
+  });
+  app.appendChild(detailCard);
+
+  // Follow-up question
+  const followCard = el("div",{class:"card", id:"agFollowUpCard"});
+  followCard.appendChild(el("h3",{},["One Similar Follow-Up Question"]));
+  followCard.appendChild(el("p",{class:"topnote"},["Based on your weakest chapter this attempt."]));
+  followCard.appendChild(el("div",{class:"btn-row"},[el("button",{class:"btn small", onclick:function(){ agGenerateFollowUp(record); }},["Generate Follow-Up Question"])]));
+  followCard.appendChild(el("div",{id:"agFollowUpContainer"}));
+  app.appendChild(followCard);
+
+  // Action buttons
+  const actionsCard = el("div",{class:"card"});
+  actionsCard.appendChild(el("div",{class:"btn-row"},[
+    el("button",{class:"btn outline", onclick:function(){ printAGQuestionPaper(record); }},["Print Question Paper"]),
+    el("button",{class:"btn outline", onclick:function(){ printAGAnswerBooklet(record); }},["Print Answer Booklet"]),
+    el("button",{class:"btn outline", onclick:function(){ printAGMarkingScheme(record); }},["Print Marking Scheme"]),
+    el("button",{class:"btn outline", onclick:function(){ exportAGResultsToCSV(record); }},["Export Results as CSV"]),
+    el("button",{class:"btn gold", onclick:function(){ appState.assessGenView = record.kind; showPage("assessgen"); }},["Generate New Paper"]),
+    el("button",{class:"btn outline", onclick:function(){ appState.assessGenView="records"; showPage("assessgen"); }},["Back to My Assessment Records"])
+  ]));
+  app.appendChild(actionsCard);
+}
+
+function agGenerateFollowUp(record){
+  const weakestId = Object.keys(record.chapterPerf).reduce(function(worst,k){
+    if(!worst) return k;
+    return pct(record.chapterPerf[k].score,record.chapterPerf[k].total) < pct(record.chapterPerf[worst].score,record.chapterPerf[worst].total) ? k : worst;
+  }, null);
+  const topicId = weakestId || record.topics[0];
+  const q = agGenerateQuestion(topicId);
+  const container = qs("#agFollowUpContainer");
+  container.innerHTML = "";
+  const box = el("div",{class:"card", style:"background:#fbfdfd;"});
+  box.appendChild(el("p",{},[el("strong",{},[getTopic(topicId).name + " \u2014 " + q.subtopic + " (" + q.totalMarks + " marks)"])]));
+  box.appendChild(el("p",{},[q.stem]));
+  let answered = 0;
+  q.parts.forEach(function(part){
+    const pBox = el("div",{class:"step"});
+    pBox.appendChild(el("p",{},[el("strong",{},["(" + part.label + ") " + part.text]) ]));
+    if(part.type !== "self"){
+      const input = el("input",{type:"text"});
+      const fb = el("div",{});
+      pBox.appendChild(input);
+      pBox.appendChild(el("div",{class:"btn-row"},[el("button",{class:"btn small", onclick:function(){
+        const correct = answerMatches(input.value, part.accepted);
+        fb.innerHTML = "";
+        fb.appendChild(el("div",{class:"feedback-box "+(correct?"correct":"incorrect")},[(correct?"Correct. ":"Not quite. ") + part.solution]));
+      }},["Check Answer"])]));
+      pBox.appendChild(fb);
+    } else {
+      pBox.appendChild(el("p",{class:"topnote"},["Worked solution: " + part.solution]));
+    }
+    box.appendChild(pBox);
+  });
+  container.appendChild(box);
+  logActivity("Generated a follow-up question for " + getTopic(topicId).name);
+}
+
+/* ============================================================
+   PRINTING (Question Paper / Answer Booklet / Marking Scheme)
+   ============================================================ */
+function agEnterPrintMode(html){
+  let area = document.getElementById("agPrintArea");
+  if(!area){ area = document.createElement("div"); area.id = "agPrintArea"; document.body.appendChild(area); }
+  area.innerHTML = "<div class='no-print' style='text-align:right;'><button type='button' onclick='agExitPrintMode()' style='margin:8px;padding:8px 14px;'>\u2715 Exit Print View</button></div>" + html;
+  document.body.classList.add("ag-printing");
+  clearTimeout(window.__agPrintFallbackTimer);
+  window.__agPrintFallbackTimer = setTimeout(agExitPrintMode, 60000);
+}
+function agExitPrintMode(){ document.body.classList.remove("ag-printing"); clearTimeout(window.__agPrintFallbackTimer); }
+window.addEventListener("afterprint", agExitPrintMode);
+
+function agPaperHeaderHTML(record){
+  const p = appState.data.profile;
+  let html = "<div class='ag-print-header'>";
+  html += "<p style='text-align:center;font-weight:700;'>CENTRE FOR FOUNDATION STUDIES<br>INTERNATIONAL ISLAMIC UNIVERSITY MALAYSIA</p>";
+  html += "<h2 style='text-align:center;'>" + escapeHTML(record.meta.title) + "</h2>";
+  if(record.meta.notice) html += "<p style='text-align:center;font-weight:700;'>" + escapeHTML(record.meta.notice) + "</p>";
+  html += "<p>Student Name: " + escapeHTML(p.name) + " &nbsp;&nbsp; Section: " + escapeHTML(p.section) + "</p>";
+  html += "<p>Date Generated: " + escapeHTML(formatDate(record.startTime)) + (record.meta.durationMinutes ? " &nbsp;&nbsp; Duration: " + record.meta.durationMinutes + " minutes" : "") + " &nbsp;&nbsp; Total Marks: " + record.totalMarks + "</p>";
+  if(record.meta.instructions) html += "<p><em>Instructions: " + escapeHTML(record.meta.instructions) + "</em></p>";
+  html += "<hr>";
+  html += "</div>";
+  return html;
+}
+function buildQuestionPaperHTML(record){
+  let html = agPaperHeaderHTML(record);
+  record.questions.forEach(function(q, qi){
+    html += "<div class='ag-print-question'>";
+    html += "<p><strong>Question " + (qi+1) + "</strong> &mdash; " + escapeHTML(q.subtopic) + " (" + q.totalMarks + " marks)</p>";
+    html += "<p>" + escapeHTML(q.commandWord) + ": " + escapeHTML(q.stem).replace(/\n/g,"<br>") + "</p>";
+    q.parts.forEach(function(part){
+      html += "<p style='margin-left:20px;'>(" + part.label + ") " + escapeHTML(part.text) + " <em>[" + part.marks + " mark(s)]</em></p>";
+      for(let i=0;i<3;i++){ html += "<div class='ag-ruled-line'></div>"; }
+    });
+    html += "</div>";
+  });
+  html += "<p style='text-align:center;font-weight:700;margin-top:20px;'>END OF QUESTIONS</p>";
+  return html;
+}
+function buildAnswerBookletHTML(record){
+  let html = agPaperHeaderHTML(record);
+  html += "<h3>Answer Booklet</h3>";
+  record.questions.forEach(function(q, qi){
+    html += "<div class='ag-print-question'>";
+    html += "<p><strong>Question " + (qi+1) + "</strong> (" + q.totalMarks + " marks)</p>";
+    q.parts.forEach(function(part){
+      html += "<p style='margin-left:20px;'>(" + part.label + ") Answer:</p>";
+      for(let i=0;i<5;i++){ html += "<div class='ag-ruled-line'></div>"; }
+    });
+    html += "</div>";
+  });
+  html += "<p style='text-align:center;font-weight:700;margin-top:20px;'>END OF ANSWER BOOKLET</p>";
+  return html;
+}
+function buildMarkingSchemeHTML(record){
+  let html = agPaperHeaderHTML(record);
+  html += "<div style='page-break-before:always;'></div>";
+  html += "<h3>Marking Scheme</h3>";
+  record.questions.forEach(function(q, qi){
+    html += "<div class='ag-print-question'>";
+    html += "<p><strong>Question " + (qi+1) + "</strong> \u2014 " + escapeHTML(q.subtopic) + " (" + q.totalMarks + " marks)</p>";
+    q.parts.forEach(function(part){
+      html += "<p style='margin-left:20px;'><strong>(" + part.label + ") [" + part.marks + " mark(s)]</strong></p>";
+      html += "<ul>";
+      part.marking.forEach(function(m){ html += "<li>" + escapeHTML(m) + "</li>"; });
+      html += "</ul>";
+      html += "<p style='margin-left:20px;'>Worked solution: " + escapeHTML(part.solution) + "</p>";
+    });
+    html += "</div>";
+  });
+  html += "<p style='text-align:center;font-weight:700;margin-top:20px;'>Total: " + record.totalMarks + " marks</p>";
+  return html;
+}
+function printAGQuestionPaper(record){ agEnterPrintMode(buildQuestionPaperHTML(record)); window.print(); }
+function printAGAnswerBooklet(record){ agEnterPrintMode(buildAnswerBookletHTML(record)); window.print(); }
+function printAGMarkingScheme(record){ agEnterPrintMode(buildMarkingSchemeHTML(record)); window.print(); }
+
+/* ============================================================
+   CSV EXPORT
+   ============================================================ */
+function exportAGResultsToCSV(record){
+  const rows = [["Question","Part","Skill","Marks","Student Answer","Correct/Self-Assessed","Marks Awarded"]];
+  record.questions.forEach(function(q, qi){
+    q.parts.forEach(function(part){
+      const resp = agGetResponse(record, qi, part.label);
+      rows.push([
+        "Q" + (qi+1), part.label, q.skillTag, part.marks,
+        part.type === "self" ? "(self-assessed working)" : (resp.answer || ""),
+        part.type === "self" ? "STUDENT SELF-ASSESSED" : (resp.correct ? "Correct" : "Incorrect"),
+        resp.awarded !== undefined ? resp.awarded : ""
+      ]);
+    });
+  });
+  rows.push([]);
+  rows.push(["Total Score", record.score, "out of", record.totalMarks]);
+  rows.push(["Recommended Revision", record.recommendedRevision]);
+  const csv = rows.map(function(r){ return r.map(function(c){ return '"' + String(c===undefined?"":c).replace(/"/g,'""') + '"'; }).join(","); }).join("\n");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "MTCF0114_" + record.kind + "_" + record.id + "_results.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ============================================================
+   RECORDS LIST (drafts & submitted papers)
+   ============================================================ */
+function renderAGRecordsList(){
+  const app = qs("#app");
+  const card = el("div",{class:"card"});
+  card.appendChild(el("h3",{},["My Assessment Records"]));
+  const records = appState.data.assessmentRecords;
+  if(records.length === 0){
+    card.appendChild(el("p",{class:"topnote"},["No assessment papers generated yet. Use the tabs above to create a Mock Topic Quiz, Mock OBT or Mock Final Examination."]));
+    app.appendChild(card);
+    return;
+  }
+  const table = el("table",{class:"data-table"});
+  table.appendChild(el("tr",{},[el("th",{},["Title"]),el("th",{},["Date"]),el("th",{},["Status"]),el("th",{},["Score"]),el("th",{},["Actions"])]));
+  records.forEach(function(r){
+    const actionsCell = el("td",{});
+    if(r.status === "draft"){
+      actionsCell.appendChild(el("button",{class:"btn small", onclick:function(){ renderAGRunnerPage(r.id); }},["Resume"]));
+    } else {
+      actionsCell.appendChild(el("button",{class:"btn small", onclick:function(){ renderAGResults(r.id); }},["View Results"]));
+    }
+    actionsCell.appendChild(el("button",{class:"btn small outline", style:"margin-left:6px;", onclick:function(){ printAGQuestionPaper(r); }},["Print"]));
+    actionsCell.appendChild(el("button",{class:"btn small danger", style:"margin-left:6px;", onclick:function(){ agDeleteRecord(r.id); }},["Delete"]));
+    table.appendChild(el("tr",{},[
+      el("td",{},[r.meta.title]),
+      el("td",{},[formatDate(r.startTime)]),
+      el("td",{},[r.status === "draft" ? "Draft" : "Submitted"]),
+      el("td",{},[r.status === "submitted" ? (r.score + " / " + r.totalMarks) : "\u2014"]),
+      actionsCell
+    ]));
+  });
+  card.appendChild(table);
+  card.appendChild(el("div",{class:"btn-row"},[el("button",{class:"btn small danger", onclick:openAGClearAllConfirm},["Clear All Assessment Records"])]));
+  app.appendChild(card);
+}
+function agDeleteRecord(id){
+  appState.data.assessmentRecords = appState.data.assessmentRecords.filter(function(r){ return r.id !== id; });
+  saveStudentData();
+  showPage("assessgen");
+}
+function openAGClearAllConfirm(onCleared){
+  const overlay = el("div",{class:"modal-overlay", onclick:function(ev){ if(ev.target===overlay) closeModal(); }});
+  const box = el("div",{class:"modal-box"});
+  box.appendChild(el("h2",{},["Clear All Assessment Records?"]));
+  box.appendChild(el("p",{},["This permanently deletes all generated Mock Topic Quizzes, Mock OBTs and Mock Final Examinations (including drafts and submitted results) on this device. This cannot be undone."]));
+  box.appendChild(el("div",{class:"btn-row"},[
+    el("button",{class:"btn danger", onclick:function(){
+      appState.data.assessmentRecords = [];
+      saveStudentData();
+      closeModal();
+      if(typeof onCleared === "function") onCleared(); else showPage("assessgen");
+    }},["Yes, Clear All Records"]),
+    el("button",{class:"btn outline", onclick:closeModal},["Cancel"])
+  ]));
+  overlay.appendChild(box);
+  qs("#modalRoot").appendChild(overlay);
+}
 </script>
 </body>
 </html>
