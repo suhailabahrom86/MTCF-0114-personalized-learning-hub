@@ -156,7 +156,7 @@ body.ag-printing #agPrintArea{
   display:block !important; max-width:800px; margin:0 auto; padding:24px; font-family:'Segoe UI',Tahoma,sans-serif; color:#000; background:#fff;
 }
 body.ag-printing #agPrintArea .ag-print-question{ margin-bottom:16px; page-break-inside:avoid; }
-body.ag-printing #agPrintArea .ag-ruled-line{ border-bottom:1px solid #999; height:22px; margin-left:20px; }
+body.ag-printing #agPrintArea .ag-blank-space{ margin-left:20px; }
 @media print{
   #agPrintArea{ box-shadow:none; }
   body.ag-printing #agPrintArea{ padding:0; }
@@ -936,6 +936,45 @@ function subDigit(n){
   const map = {"0":"\u2080","1":"\u2081","2":"\u2082","3":"\u2083","4":"\u2084","5":"\u2085","6":"\u2086","7":"\u2087","8":"\u2088","9":"\u2089"};
   return String(n).split("").map(function(d){ return map[d] || d; }).join("");
 }
+function agPeriodStr(bVal){
+  const f = agSimplifyFrac(2, bVal);
+  if(f.den === 1) return (f.num === 1 ? "\u03c0" : f.num + "\u03c0");
+  return (f.num === 1 ? "\u03c0" : f.num + "\u03c0") + "/" + f.den;
+}
+function agTrigGraphSVG(a, bVal, funcName){
+  const W = 320, H = 170, midY = H / 2, padX = 34, plotW = W - padX - 14;
+  const ampPx = H * 0.32;
+  const N = 60;
+  const points = [];
+  for(let i = 0; i <= N; i++){
+    const t = i / N;
+    const angle = t * 2 * Math.PI;
+    const yVal = funcName === "sin" ? Math.sin(angle) : Math.cos(angle);
+    const px = padX + t * plotW;
+    const py = midY - yVal * ampPx;
+    points.push(px.toFixed(1) + "," + py.toFixed(1));
+  }
+  const pathD = "M " + points.join(" L ");
+  let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Graph of a sinusoidal function" style="max-width:320px;width:100%;height:auto;background:#fff;">';
+  svg += '<line x1="' + padX + '" y1="' + midY + '" x2="' + (W - 10) + '" y2="' + midY + '" stroke="#546570" stroke-width="1"/>';
+  svg += '<line x1="' + padX + '" y1="10" x2="' + padX + '" y2="' + (H - 10) + '" stroke="#546570" stroke-width="1"/>';
+  svg += '<line x1="' + padX + '" y1="' + (midY - ampPx) + '" x2="' + (W - 10) + '" y2="' + (midY - ampPx) + '" stroke="#d3dbdd" stroke-width="1" stroke-dasharray="3,3"/>';
+  svg += '<line x1="' + padX + '" y1="' + (midY + ampPx) + '" x2="' + (W - 10) + '" y2="' + (midY + ampPx) + '" stroke="#d3dbdd" stroke-width="1" stroke-dasharray="3,3"/>';
+  svg += '<path d="' + pathD + '" fill="none" stroke="#19918E" stroke-width="2.5"/>';
+  svg += '<text x="6" y="' + (midY - ampPx + 4) + '" font-size="11" fill="#1F2933">' + a + '</text>';
+  svg += '<text x="2" y="' + (midY + ampPx + 4) + '" font-size="11" fill="#1F2933">\u2212' + a + '</text>';
+  const ticks = [0, 0.25, 0.5, 0.75, 1];
+  const labels = ["0", "T/4", "T/2", "3T/4", "T"];
+  ticks.forEach(function(t, i){
+    const px = padX + t * plotW;
+    svg += '<line x1="' + px + '" y1="' + (midY - 3) + '" x2="' + px + '" y2="' + (midY + 3) + '" stroke="#546570" stroke-width="1"/>';
+    svg += '<text x="' + (px - 9) + '" y="' + (midY + 18) + '" font-size="10" fill="#546570">' + labels[i] + '</text>';
+  });
+  svg += '<text x="' + (W - 16) + '" y="' + (midY - 6) + '" font-size="10" fill="#546570">x</text>';
+  svg += '<text x="' + (padX - 4) + '" y="16" font-size="10" fill="#546570">y</text>';
+  svg += '</svg>';
+  return svg;
+}
 
 /* ---------- Template registry ----------
    Each template is a function() returning:
@@ -1120,6 +1159,36 @@ const AG_TEMPLATES = {
             solution:"Since the numerator and denominator are both degree 1, the horizontal asymptote is the ratio of leading coefficients: y = " + m + "/" + p + " = " + ha + "." }
         ]
       };
+    },
+    function tplPartialFractions(){
+      // Construct backwards from clean integer A, B so the decomposition is exact.
+      const roots = agPickDistinct(-5, 5, 2);
+      const p = roots[0], q = roots[1];
+      let A = agRandNonZero(-4, 4);
+      let B = agRandNonZero(-4, 4);
+      while(B === A){ B = agRandNonZero(-4, 4); }
+      const m = A + B;
+      const n = -(A * q + B * p);
+      const numStr = agFmtLinear(m, n);
+      const denomStr = "(x " + agSignedStr(-p) + ")(x " + agSignedStr(-q) + ")";
+      const decompStr = (A < 0 ? "\u2212" + Math.abs(A) : A) + "/(x " + agSignedStr(-p) + ") " + (B >= 0 ? "+ " : "\u2212 ") + Math.abs(B) + "/(x " + agSignedStr(-q) + ")";
+      return {
+        topicId:"polynomial", subtopic:"Partial Fraction Decomposition", difficulty:"assessment", commandWord:"Decompose",
+        skillTag:"partial-fractions", errorTag:"none",
+        stem: "Express (" + numStr + ") / " + denomStr + " in partial fractions of the form A/(x " + agSignedStr(-p) + ") + B/(x " + agSignedStr(-q) + ").",
+        parts:[
+          { label:"a", text:"By multiplying both sides by the common denominator and substituting suitable values of x, find the values of A and B.", marks:4, type:"expression",
+            accepted:[normaliseAnswer("A="+A+",B="+B), normaliseAnswer("A="+A+" B="+B)],
+            hint:"Multiply both sides by (x " + agSignedStr(-p) + ")(x " + agSignedStr(-q) + "), then substitute x = " + p + " and x = " + q + " in turn to isolate A and B.",
+            marking:["Correct equation formed after clearing denominators (1)","Substitution x = "+p+" used to find one constant (1)","Substitution x = "+q+" used to find the other constant (1)","Both A and B correctly stated (1)"],
+            solution:numStr + " = A(x " + agSignedStr(-q) + ") + B(x " + agSignedStr(-p) + "). Substituting x = " + p + ": " + numStr.replace(/x/g,"("+p+")") + " = A(" + p + agSignedStr(-q) + "), giving A = " + A + ". Substituting x = " + q + " similarly gives B = " + B + "." },
+          { label:"b", text:"Hence, write the full partial fraction decomposition.", marks:2, type:"expression",
+            accepted:[normaliseAnswer(decompStr)],
+            hint:"Substitute your values of A and B from part (a) into A/(x " + agSignedStr(-p) + ") + B/(x " + agSignedStr(-q) + ").",
+            marking:["Correct decomposition with both constants substituted correctly (2)"],
+            solution:"(" + numStr + ") / " + denomStr + " = " + decompStr + "." }
+        ]
+      };
     }
   ],
 
@@ -1167,6 +1236,32 @@ const AG_TEMPLATES = {
             hint:"Rearrange the exponential-form equation from part (a) to isolate x.",
             marking:["Correct rearrangement (1)","Correct value of x, checked against the domain (1)"],
             solution:"x " + agSignedStr(shift) + " = " + Math.pow(base,power) + ", so x = " + xVal + ". Since x " + agSignedStr(shift) + " = " + Math.pow(base,power) + " > 0, this value satisfies the domain of the logarithm." }
+        ]
+      };
+    },
+    function tplExpQuadraticSubstitution(){
+      const baseVal = [2,3][agRandInt(0,1)];
+      const k1 = agRandInt(1,3);
+      const p = Math.pow(baseVal, k1); // clean root: x = k1
+      let q = agRandInt(2, 20);
+      while(q === p || Math.pow(baseVal, Math.round(Math.log(q)/Math.log(baseVal))) === q){ q = agRandInt(2,20); } // avoid q also being a clean power of the base
+      const sum = p + q, prod = p * q;
+      const qLogAnswer = "log" + subDigit(baseVal) + "(" + q + ")";
+      return {
+        topicId:"explog", subtopic:"Exponential Equations (Quadratic Form)", difficulty:"challenging", commandWord:"Solve",
+        skillTag:"explog-quadratic-substitution", errorTag:"none",
+        stem: "Solve the equation " + baseVal + "^(2x) \u2212 " + sum + "(" + baseVal + "^x) + " + prod + " = 0.",
+        parts:[
+          { label:"a", text:"By letting y = " + baseVal + "^x, rewrite the equation as a quadratic in y and solve for y.", marks:4, type:"expression",
+            accepted:[normaliseAnswer("y="+p+" or y="+q), normaliseAnswer("y="+q+" or y="+p)],
+            hint:"Substituting y = " + baseVal + "^x gives y\u00b2 \u2212 " + sum + "y + " + prod + " = 0. Factorise this quadratic in y.",
+            marking:["Correct substitution y = " + baseVal + "^x applied (1)","Quadratic in y correctly factorised (2)","Both values of y correctly stated (1)"],
+            solution:"Let y = " + baseVal + "^x. The equation becomes y\u00b2 \u2212 " + sum + "y + " + prod + " = 0, which factorises as (y \u2212 " + p + ")(y \u2212 " + q + ") = 0, giving y = " + p + " or y = " + q + "." },
+          { label:"b", text:"Hence, find all values of x, giving exact answers.", marks:3, type:"expression",
+            accepted:[normaliseAnswer("x="+k1+" or x="+qLogAnswer), normaliseAnswer("x="+qLogAnswer+" or x="+k1)],
+            hint:"Solve " + baseVal + "^x = " + p + " and " + baseVal + "^x = " + q + " separately. One gives a whole number; the other must be left in logarithmic form.",
+            marking:["First equation solved to give x = "+k1+" (1)","Second equation converted to logarithmic form (1)","Correct exact final answer x = "+qLogAnswer+" (1)"],
+            solution:baseVal + "^x = " + p + " = " + baseVal + "^" + k1 + " gives x = " + k1 + ". " + baseVal + "^x = " + q + " is not a clean power of " + baseVal + ", so x = " + qLogAnswer + " (exact form)." }
         ]
       };
     }
@@ -1230,6 +1325,32 @@ const AG_TEMPLATES = {
             hint:"Period = 2\u03c0 divided by the coefficient of x.",
             marking:["Correct formula used (1)","Correct period stated (1)"],
             solution:"Period = 2\u03c0 / " + bVal + " = " + periodStr + "." }
+        ]
+      };
+    },
+    function tplGraphInterpretation(){
+      const a = agRandInt(2,5);
+      const bVal = [1,2,3][agRandInt(0,2)];
+      const funcName = Math.random()<0.5 ? "sin" : "cos";
+      const periodStr = agPeriodStr(bVal);
+      const quarterVal = funcName === "sin" ? a : 0;
+      const svg = agTrigGraphSVG(a, bVal, funcName);
+      return {
+        topicId:"trig", subtopic:"Graph of Sinusoidal Functions", difficulty:"assessment", commandWord:"Interpret",
+        skillTag:"trig-graph-interpretation", errorTag:"none",
+        stem: "The diagram shows one complete period of the graph of y = " + a + " " + funcName + "(" + (bVal===1?"":bVal) + "x), where T is the period of the function.",
+        graphSvg: svg,
+        parts:[
+          { label:"a", text:"Using the graph, state the period T of the function in terms of \u03c0.", marks:2, type:"expression",
+            accepted:[normaliseAnswer(periodStr)],
+            hint:"Read the value of x at which the curve completes one full cycle, as marked on the graph.",
+            marking:["Correct period read from the graph (2)"],
+            solution:"One complete cycle spans from x = 0 to x = T, so T = 2\u03c0/" + bVal + " = " + periodStr + "." },
+          { label:"b", text:"Hence, state the exact value of y at x = T/4, as shown on the graph.", marks:2, type:"numeric",
+            accepted:[String(quarterVal)],
+            hint:"At x = T/4, the angle " + (bVal===1?"":bVal) + "x equals \u03c0/2. Evaluate " + a + funcName + "(\u03c0/2).",
+            marking:["Correct exact value read from the graph (2)"],
+            solution:"At x = T/4, " + (bVal===1?"":bVal) + "x = \u03c0/2, so y = " + a + funcName + "(\u03c0/2) = " + a + " \u00d7 " + (funcName==="sin"?"1":"0") + " = " + quarterVal + "." }
         ]
       };
     }
@@ -1314,80 +1435,197 @@ function agRedistributeMarkingPoints(part){
 }
 
 function agScaleQuestionsToTarget(questions, targetTotal){
-  const rawTotal = questions.reduce(function(s,q){ return s + q.totalMarks; }, 0);
-  if(rawTotal === 0) return questions;
+  const allParts = [];
+  questions.forEach(function(q){ q.parts.forEach(function(part){ allParts.push(part); }); });
+  const rawTotal = allParts.reduce(function(s,p){ return s + p.marks; }, 0);
+  if(rawTotal === 0 || allParts.length === 0) return questions;
   const scale = targetTotal / rawTotal;
-  let runningTotal = 0;
-  const lastQuestion = questions[questions.length-1];
-  const lastPart = lastQuestion.parts[lastQuestion.parts.length-1];
-  questions.forEach(function(q){
-    q.parts.forEach(function(part){
-      if(part === lastPart) return; // fix this one last, after summing the rest
-      part.marks = Math.max(1, Math.round(part.marks * scale));
-      runningTotal += part.marks;
-    });
-  });
-  lastPart.marks = Math.max(1, targetTotal - runningTotal);
-  questions.forEach(function(q){
-    q.parts.forEach(function(part){ agRedistributeMarkingPoints(part); });
-    q.totalMarks = q.parts.reduce(function(s,p){ return s + p.marks; }, 0);
-  });
+
+  // Largest-remainder (Hamilton) apportionment: guarantees the marks assigned
+  // to every part sum to EXACTLY targetTotal, however many parts there are.
+  const exact = allParts.map(function(p){ return p.marks * scale; });
+  let base = exact.map(function(e){ return Math.max(1, Math.floor(e)); });
+  let sumBase = base.reduce(function(s,v){ return s+v; }, 0);
+  let remainder = targetTotal - sumBase;
+
+  if(remainder > 0){
+    // Distribute leftover marks to the parts with the largest fractional remainder first.
+    const order = exact.map(function(e,i){ return { i:i, frac: e - Math.floor(e) }; }).sort(function(a,b){ return b.frac - a.frac; });
+    let idx = 0;
+    while(remainder > 0){
+      base[order[idx % order.length].i]++;
+      remainder--; idx++;
+    }
+  } else if(remainder < 0){
+    // Too many marks were allocated (can happen once every part is floored up to a minimum
+    // of 1). Remove excess one at a time from whichever part currently has the most marks,
+    // never dropping a part below 1 mark.
+    while(remainder < 0){
+      let maxIdx = 0;
+      for(let i=1;i<base.length;i++){ if(base[i] > base[maxIdx]) maxIdx = i; }
+      if(base[maxIdx] <= 1) break; // safety: cannot reduce further without going below 1
+      base[maxIdx]--;
+      remainder++;
+    }
+  }
+
+  allParts.forEach(function(part, i){ part.marks = base[i]; agRedistributeMarkingPoints(part); });
+  questions.forEach(function(q){ q.totalMarks = q.parts.reduce(function(s,p){ return s + p.marks; }, 0); });
   return questions;
 }
 
 /* ---------- Generation engine ---------- */
 let AG_LAST_SIGNATURE = null;
 
-function agGenerateQuestion(topicId){
-  const templates = AG_TEMPLATES[topicId];
-  const fn = templates[agRandInt(0, templates.length-1)];
-  const q = fn();
+// Skill tags that represent an interval / domain / validity restriction.
+const AG_DOMAIN_SKILLS = ["inequality-sign-reversal", "domain-restriction", "asymptotes", "log-equations"];
+// Skill tags that represent an exact-value question (a dedicated exact-value question,
+// or the graph-interpretation question, which also requires reading an exact value).
+const AG_EXACT_VALUE_SKILLS = ["reference-angle", "trig-graph-interpretation"];
+// Skill tags that represent a genuinely combined-skill question (more than one technique required).
+const AG_COMBINED_SKILLS = ["partial-fractions", "explog-quadratic-substitution"];
+// Skill tags explicitly excluded from Quiz 3 (Systems), which must never include inverse-matrix questions.
+const AG_INVERSE_MATRIX_SKILLS = ["matrix-inverse", "inverse-matrix"];
+
+function agBuildQuestionFromTemplate(topicId, templateFn){
+  const q = templateFn();
   q.id = "ag-" + topicId + "-" + Date.now() + "-" + agRandInt(1000,9999);
   q.totalMarks = q.parts.reduce(function(s,p){ return s + p.marks; }, 0);
+  q.conceptId = q.topicId + "::" + q.skillTag;
   return q;
 }
+function agGenerateQuestion(topicId, excludeSkills){
+  const templates = AG_TEMPLATES[topicId];
+  let q, attempts = 0;
+  do{
+    const fn = templates[agRandInt(0, templates.length-1)];
+    q = agBuildQuestionFromTemplate(topicId, fn);
+    attempts++;
+  } while(excludeSkills && excludeSkills.indexOf(q.skillTag) !== -1 && attempts < 20);
+  return q;
+}
+function agHasHenceSubpart(q){
+  return q.parts.some(function(p){ return /^hence\b/i.test(p.text.trim()); });
+}
+function agIsDomainRestrictionQuestion(q){ return AG_DOMAIN_SKILLS.indexOf(q.skillTag) !== -1; }
+function agIsExactValueQuestion(q){ return AG_EXACT_VALUE_SKILLS.indexOf(q.skillTag) !== -1; }
+function agIsGraphQuestion(q){ return !!q.graphSvg; }
+function agIsCombinedSkillQuestion(q){ return AG_COMBINED_SKILLS.indexOf(q.skillTag) !== -1; }
 
 function agSignature(questions){
   return questions.map(function(q){ return q.stem; }).join("|");
 }
 
-function agGenerateTopicQuiz(topicId, count, difficultyFilter){
-  let attempts = 0;
-  let questions;
+/* ---------- MOCK TOPIC QUIZ: fixed official presets ---------- */
+const AG_QUIZ_PRESETS = {
+  "Quiz 1": { topicId:"algebra",    label:"Quiz 1 \u2014 Topic 1: Algebra" },
+  "Quiz 2": { topicId:"polynomial", label:"Quiz 2 \u2014 Topic 3: Polynomial and Rational Functions" },
+  "Quiz 3": { topicId:"systems",    label:"Quiz 3 \u2014 Topic 6: Systems of Linear Equations", excludeSkills: AG_INVERSE_MATRIX_SKILLS }
+};
+function agGenerateQuiz(quizKey){
+  const preset = AG_QUIZ_PRESETS[quizKey];
+  if(!preset) throw new Error("Unknown quiz preset: " + quizKey);
+  let attempts = 0, questions, totalMarks;
   do{
+    const count = agRandInt(3, 5);
     questions = [];
-    for(let i=0;i<count;i++){ questions.push(agGenerateQuestion(topicId)); }
+    for(let i=0;i<count;i++){ questions.push(agGenerateQuestion(preset.topicId, preset.excludeSkills)); }
+    agScaleQuestionsToTarget(questions, 20);
+    totalMarks = questions.reduce(function(s,q){ return s + q.totalMarks; }, 0);
     attempts++;
   } while(agSignature(questions) === AG_LAST_SIGNATURE && attempts < 5);
   AG_LAST_SIGNATURE = agSignature(questions);
-  const totalMarks = questions.reduce(function(s,q){ return s + q.totalMarks; }, 0);
-  return { questions: questions, totalMarks: totalMarks };
+  return { quizKey: quizKey, questions: questions, totalMarks: totalMarks, durationMinutes: 40, topicId: preset.topicId, label: preset.label };
+}
+function agValidateQuiz(result, quizKey){
+  const preset = AG_QUIZ_PRESETS[quizKey];
+  const issues = [];
+  if(result.questions.length < 3 || result.questions.length > 5) issues.push("Question count out of range (3-5): " + result.questions.length);
+  if(!result.questions.every(function(q){ return q.topicId === preset.topicId; })) issues.push("A question from outside the assigned topic was included");
+  if(result.totalMarks !== 20) issues.push("Total marks is not exactly 20: " + result.totalMarks);
+  if(result.durationMinutes !== 40) issues.push("Duration is not exactly 40 minutes");
+  if(preset.excludeSkills && result.questions.some(function(q){ return preset.excludeSkills.indexOf(q.skillTag) !== -1; })) issues.push("An excluded (inverse-matrix) question was included");
+  return issues;
 }
 
-const AG_OBT_PRESETS = {
-  "Short OBT": { count:3, marks:20, minutes:30 },
-  "Standard OBT": { count:5, marks:30, minutes:45 },
-  "Extended OBT": { count:6, marks:40, minutes:60 }
+/* ---------- MOCK OBT: fixed official presets ---------- */
+const AG_OBT_TOPIC_PRESETS = {
+  "OBT 1": { topicId:"functions", label:"OBT 1 \u2014 Topic 2: Functions and Their Graphs" },
+  "OBT 2": { topicId:"explog",    label:"OBT 2 \u2014 Topic 4: Exponential and Logarithmic Functions" },
+  "OBT 3": { topicId:"trig",      label:"OBT 3 \u2014 Topic 5: Trigonometric Functions" }
 };
-
-function agGenerateOBT(topicIds, presetName){
-  const preset = AG_OBT_PRESETS[presetName];
-  const questions = [];
-  for(let i=0;i<preset.count;i++){
-    const topicId = topicIds[i % topicIds.length];
-    questions.push(agGenerateQuestion(topicId));
-  }
-  agScaleQuestionsToTarget(questions, preset.marks);
-  const totalMarks = questions.reduce(function(s,q){ return s + q.totalMarks; }, 0);
-  return { questions: questions, totalMarks: totalMarks, durationMinutes: preset.minutes, targetMarks: preset.marks };
+function agGenerateOBT(obtKey){
+  const preset = AG_OBT_TOPIC_PRESETS[obtKey];
+  if(!preset) throw new Error("Unknown OBT preset: " + obtKey);
+  let attempts = 0, questions, totalMarks;
+  do{
+    const count = agRandInt(3, 5);
+    questions = [];
+    for(let i=0;i<count;i++){ questions.push(agGenerateQuestion(preset.topicId)); }
+    agScaleQuestionsToTarget(questions, 15);
+    totalMarks = questions.reduce(function(s,q){ return s + q.totalMarks; }, 0);
+    attempts++;
+  } while(agSignature(questions) === AG_LAST_SIGNATURE && attempts < 5);
+  AG_LAST_SIGNATURE = agSignature(questions);
+  return { obtKey: obtKey, questions: questions, totalMarks: totalMarks, durationMinutes: 30, topicId: preset.topicId, label: preset.label };
+}
+function agValidateOBT(result, obtKey){
+  const preset = AG_OBT_TOPIC_PRESETS[obtKey];
+  const issues = [];
+  if(result.questions.length < 3 || result.questions.length > 5) issues.push("Question count out of range (3-5): " + result.questions.length);
+  if(!result.questions.every(function(q){ return q.topicId === preset.topicId; })) issues.push("A question from outside the assigned topic was included");
+  if(result.totalMarks !== 15) issues.push("Total marks is not exactly 15: " + result.totalMarks);
+  if(result.durationMinutes !== 30) issues.push("Duration is not exactly 30 minutes");
+  return issues;
 }
 
-const AG_FINAL_EXAM_TOPIC_ORDER = ["algebra","functions","functions","polynomial","explog","trig","systems"];
+/* ---------- MOCK FINAL EXAMINATION: 7 questions, 70 marks, concept-diverse ----------
+   Each of the 7 slots below is deliberately mapped to a distinct required concept
+   category from the syllabus. Concept IDs (topicId::skillTag) are tracked and any
+   collision is rejected and regenerated, guaranteeing no duplicate primary concept. */
 function agGenerateFinalExam(){
-  const questions = AG_FINAL_EXAM_TOPIC_ORDER.map(function(topicId){ return agGenerateQuestion(topicId); });
-  agScaleQuestionsToTarget(questions, 70);
+  let attempts = 0, questions, usedConcepts;
+  do{
+    questions = [];
+    usedConcepts = {};
+    const slotPicks = [
+      function(){ return agBuildQuestionFromTemplate("algebra", AG_TEMPLATES.algebra[1]); },   // interval/inequality (domain restriction)
+      function(){ return agBuildQuestionFromTemplate("functions", AG_TEMPLATES.functions[0]); }, // inverse functions
+      function(){ return agBuildQuestionFromTemplate("polynomial", AG_TEMPLATES.polynomial[0]); }, // remainder/factor theorem
+      function(){ return agBuildQuestionFromTemplate("polynomial", AG_TEMPLATES.polynomial[2]); }, // partial fractions (combined skill)
+      function(){ return agBuildQuestionFromTemplate("explog", AG_TEMPLATES.explog[2]); },        // quadratic substitution (combined skill)
+      function(){ return agBuildQuestionFromTemplate("trig", AG_TEMPLATES.trig[2]); },            // graph interpretation + exact value
+      function(){ return agBuildQuestionFromTemplate("systems", AG_TEMPLATES.systems[agRandInt(0,1)]); } // system or matrix operations
+    ];
+    slotPicks.forEach(function(pickFn){
+      let q, tries = 0;
+      do{ q = pickFn(); tries++; } while(usedConcepts[q.conceptId] && tries < 5);
+      usedConcepts[q.conceptId] = true;
+      questions.push(q);
+    });
+    agScaleQuestionsToTarget(questions, 70);
+    attempts++;
+  } while(agValidateFinalExam({questions:questions, totalMarks:70}).length > 0 && attempts < 8);
   const totalMarks = questions.reduce(function(s,q){ return s + q.totalMarks; }, 0);
   return { questions: questions, totalMarks: totalMarks };
+}
+function agValidateFinalExam(result){
+  const issues = [];
+  if(result.questions.length !== 7) issues.push("Expected exactly 7 questions, got " + result.questions.length);
+  if(result.totalMarks !== 70) issues.push("Total marks is not exactly 70: " + result.totalMarks);
+  const concepts = result.questions.map(function(q){ return q.conceptId; });
+  const dupes = concepts.filter(function(c,i){ return concepts.indexOf(c) !== i; });
+  if(dupes.length) issues.push("Duplicate primary concept detected: " + dupes.join(", "));
+  const henceCount = result.questions.reduce(function(s,q){ return s + q.parts.filter(function(p){ return /^hence\b/i.test(p.text.trim()); }).length; }, 0);
+  if(henceCount < 2) issues.push("Fewer than 2 'Hence' subparts (found " + henceCount + ")");
+  if(!result.questions.some(agIsGraphQuestion)) issues.push("Missing a graph / graph-interpretation question");
+  if(!result.questions.some(agIsExactValueQuestion)) issues.push("Missing an exact-value question");
+  if(!result.questions.some(agIsDomainRestrictionQuestion)) issues.push("Missing an interval/domain/validity restriction question");
+  if(!result.questions.some(agIsCombinedSkillQuestion)) issues.push("Missing a question that combines related skills");
+  const topicsCovered = {};
+  result.questions.forEach(function(q){ topicsCovered[q.topicId] = true; });
+  if(Object.keys(topicsCovered).length < 6) issues.push("Does not cover all six syllabus topics (covers " + Object.keys(topicsCovered).length + ")");
+  return issues;
 }
 
 /* ============================================================
@@ -3628,46 +3866,42 @@ function renderAGQuizSetup(){
   const app = qs("#app");
   const card = el("div",{class:"card"});
   card.appendChild(el("h3",{},["Mock Topic Quiz"]));
-  card.appendChild(el("p",{class:"topnote"},["Structured, examination-style questions for one chapter at a time. Each question includes numbered subparts with individual mark allocations."]));
+  card.appendChild(el("p",{class:"topnote"},["Each quiz follows the official MTCF 0114 quiz structure: 3\u20135 structured-response questions, exactly 20 marks, 40 minutes, from a single assigned topic only. There are no multiple-choice questions and no custom settings."]));
 
-  const form = el("form",{id:"agQuizForm"});
-  form.appendChild(fieldSelect("agqTopic","Chapter", agTopicList().map(function(t){return t.name;})));
-  form.appendChild(fieldOptionCards("agqDifficulty","Difficulty",["Basic","Intermediate","Assessment Level","Challenge","Mixed"]));
-  form.appendChild(fieldOptionCards("agqCount","Number of Questions",["3","5","7","10"]));
-  form.appendChild(fieldOptionCards("agqTiming","Timing",["Untimed","Timed"]));
-  form.appendChild(fieldOptionCards("agqMode","Mode",["Practice Mode (hints + feedback per question)","Assessment Mode (no hints, feedback at the end)"]));
-  form.appendChild(fieldOptionCards("agqHints","Hints Available (Practice Mode only)",["Yes","No"]));
-  form.appendChild(el("div",{class:"btn-row"},[el("button",{type:"submit",class:"btn gold"},["Generate Mock Topic Quiz"])]));
-
-  form.addEventListener("submit", function(ev){
-    ev.preventDefault();
-    const topicName = qs("#agqTopic",form).value;
-    const topic = TOPICS.find(function(t){return t.name===topicName;});
-    const difficulty = getSelectedOption(form,"agqDifficulty") || "Mixed";
-    const count = parseInt(getSelectedOption(form,"agqCount")||"5",10);
-    const timed = getSelectedOption(form,"agqTiming") === "Timed";
-    const assessmentMode = (getSelectedOption(form,"agqMode")||"").indexOf("Assessment") === 0;
-    const hintsAvailable = !assessmentMode && (getSelectedOption(form,"agqHints") === "Yes");
-    startAGQuiz(topic.id, count, difficulty, timed, assessmentMode, hintsAvailable);
+  const grid = el("div",{class:"grid grid-3"});
+  Object.keys(AG_QUIZ_PRESETS).forEach(function(key){
+    const preset = AG_QUIZ_PRESETS[key];
+    const topic = getTopic(preset.topicId);
+    const box = el("div",{class:"card", style:"margin-bottom:0;"});
+    box.appendChild(el("div",{class:"section-title"},[el("div",{class:"icon-circle","aria-hidden":"true"},[topic.icon]), el("strong",{},[key])]));
+    box.appendChild(el("p",{class:"topnote"},[preset.label]));
+    box.appendChild(el("p",{class:"topnote"},["3\u20135 questions \u00b7 20 marks \u00b7 40 minutes"]));
+    if(preset.excludeSkills){ box.appendChild(el("p",{class:"topnote"},["Excludes inverse-matrix questions."])); }
+    box.appendChild(el("div",{class:"btn-row"},[el("button",{class:"btn gold", onclick:function(){ startAGQuiz(key); }},["Start " + key])]));
+    grid.appendChild(box);
   });
-  card.appendChild(form);
+  card.appendChild(grid);
   card.appendChild(el("h4",{},["Readiness Check"]));
   card.appendChild(agReadinessBox(null));
   app.appendChild(card);
 }
 
-function startAGQuiz(topicId, count, difficulty, timed, assessmentMode, hintsAvailable){
-  const gen = agGenerateTopicQuiz(topicId, count, difficulty);
+function startAGQuiz(quizKey){
+  const gen = agGenerateQuiz(quizKey);
+  const issues = agValidateQuiz(gen, quizKey);
+  if(issues.length){ console.warn("Mock Topic Quiz validation issues:", issues); }
+  const preset = AG_QUIZ_PRESETS[quizKey];
   const record = {
-    id: agNewRecordId("quiz"), kind:"quiz", topics:[topicId],
-    meta:{ title:"Mock Topic Quiz \u2014 " + getTopic(topicId).name, difficulty:difficulty, timed:timed, mode: assessmentMode?"Assessment Mode":"Practice Mode", hintsAvailable:hintsAvailable, durationMinutes: Math.ceil(count*4) },
+    id: agNewRecordId("quiz"), kind:"quiz", topics:[preset.topicId],
+    meta:{ title: preset.label, quizKey: quizKey, mode:"Practice Mode", hintsAvailable:true, durationMinutes: gen.durationMinutes,
+           instructions:"Answer ALL questions. Show all working clearly. No multiple-choice questions are included." },
     questions: gen.questions, totalMarks: gen.totalMarks,
     responses:{}, flags:{}, startTime:new Date().toISOString(), elapsedSeconds:0,
-    durationSeconds: timed ? count*4*60 : null, status:"draft"
+    durationSeconds: gen.durationMinutes*60, status:"draft"
   };
   agUpsertRecord(record);
   appState.assessGenSession = { recordId: record.id, currentIndex: 0 };
-  logActivity("Generated a Mock Topic Quiz for " + getTopic(topicId).name);
+  logActivity("Generated " + preset.label);
   renderAGRunnerPage(record.id);
 }
 
@@ -3678,56 +3912,43 @@ function renderAGObtSetup(){
   const app = qs("#app");
   const card = el("div",{class:"card"});
   card.appendChild(el("h3",{},["Mock OBT (Open Book Test)"]));
-  card.appendChild(el("p",{class:"topnote"},["Select one or more chapters, then choose a preset. Hints and solutions are hidden until you submit."]));
+  card.appendChild(el("p",{class:"topnote"},["Each OBT follows the official MTCF 0114 OBT structure: 3\u20135 structured-response questions, exactly 15 marks, 30 minutes, from a single assigned topic only. Hints and solutions are hidden until you submit."]));
 
-  const form = el("form",{id:"agObtForm"});
-  const topicWrap = el("div",{class:"formfield"});
-  topicWrap.appendChild(el("label",{},["Chapters to include"]));
-  const tagRow = el("div",{class:"tag-select", id:"agObtTopicsTag"});
-  const selected = {};
-  agTopicList().forEach(function(t, i){
-    if(i===0) selected[t.id] = true;
-    tagRow.appendChild(el("button",{type:"button", class: i===0 ? "selected":"", "data-topic":t.id, onclick:function(ev){
-      selected[t.id] = !selected[t.id];
-      ev.currentTarget.classList.toggle("selected");
-    }},[t.name]));
+  const grid = el("div",{class:"grid grid-3"});
+  Object.keys(AG_OBT_TOPIC_PRESETS).forEach(function(key){
+    const preset = AG_OBT_TOPIC_PRESETS[key];
+    const topic = getTopic(preset.topicId);
+    const box = el("div",{class:"card", style:"margin-bottom:0;"});
+    box.appendChild(el("div",{class:"section-title"},[el("div",{class:"icon-circle","aria-hidden":"true"},[topic.icon]), el("strong",{},[key])]));
+    box.appendChild(el("p",{class:"topnote"},[preset.label]));
+    box.appendChild(el("p",{class:"topnote"},["3\u20135 questions \u00b7 15 marks \u00b7 30 minutes"]));
+    box.appendChild(el("div",{class:"btn-row"},[el("button",{class:"btn gold", onclick:function(){ startAGObt(key); }},["Start " + key])]));
+    grid.appendChild(box);
   });
-  topicWrap.appendChild(tagRow);
-  form.appendChild(topicWrap);
-
-  form.appendChild(fieldOptionCards("agoPreset","Preset",["Short OBT","Standard OBT","Extended OBT"]));
-  const presetInfo = el("div",{class:"topnote"},["Short OBT: 3 questions, 20 marks, 30 minutes. Standard OBT: 5 questions, 30 marks, 45 minutes. Extended OBT: 6 questions, 40 marks, 60 minutes."]);
-  form.appendChild(presetInfo);
-  form.appendChild(el("div",{class:"btn-row"},[el("button",{type:"submit",class:"btn gold"},["Generate Mock OBT"])]));
-
-  form.addEventListener("submit", function(ev){
-    ev.preventDefault();
-    const chosenTopics = agTopicList().filter(function(t){return selected[t.id];}).map(function(t){return t.id;});
-    if(chosenTopics.length===0){ alert("Please select at least one chapter."); return; }
-    const preset = getSelectedOption(form,"agoPreset") || "Standard OBT";
-    startAGObt(chosenTopics, preset);
-  });
-  card.appendChild(form);
+  card.appendChild(grid);
   card.appendChild(el("h4",{},["Readiness Check"]));
-  card.appendChild(agReadinessBox(Object.keys(selected).filter(function(k){return selected[k];})));
+  card.appendChild(agReadinessBox(null));
   app.appendChild(card);
 }
 
-function startAGObt(topicIds, presetName){
-  const gen = agGenerateOBT(topicIds, presetName);
+function startAGObt(obtKey){
+  const gen = agGenerateOBT(obtKey);
+  const issues = agValidateOBT(gen, obtKey);
+  if(issues.length){ console.warn("Mock OBT validation issues:", issues); }
+  const preset = AG_OBT_TOPIC_PRESETS[obtKey];
   const p = appState.data.profile;
   const record = {
-    id: agNewRecordId("obt"), kind:"obt", topics: topicIds,
-    meta:{ title:"Mock OBT \u2014 " + presetName, presetName: presetName, studentName:p.name, studentSection:p.section,
-           dateGenerated:new Date().toISOString(), durationMinutes: AG_OBT_PRESETS[presetName].minutes,
+    id: agNewRecordId("obt"), kind:"obt", topics: [preset.topicId],
+    meta:{ title: preset.label, obtKey: obtKey, studentName:p.name, studentSection:p.section,
+           dateGenerated:new Date().toISOString(), durationMinutes: gen.durationMinutes,
            instructions:"Answer ALL questions. Show all working clearly. You may refer to your notes and textbook. Calculators are not permitted unless stated otherwise." },
     questions: gen.questions, totalMarks: gen.totalMarks,
     responses:{}, flags:{}, startTime:new Date().toISOString(), elapsedSeconds:0,
-    durationSeconds: AG_OBT_PRESETS[presetName].minutes*60, status:"draft"
+    durationSeconds: gen.durationMinutes*60, status:"draft"
   };
   agUpsertRecord(record);
   appState.assessGenSession = { recordId: record.id, currentIndex: 0 };
-  logActivity("Generated a Mock OBT (" + presetName + ") covering " + topicIds.length + " chapter(s)");
+  logActivity("Generated " + preset.label);
   renderAGRunnerPage(record.id);
 }
 
@@ -3759,6 +3980,8 @@ function renderAGFinalSetup(){
 
 function startAGFinal(timed){
   const gen = agGenerateFinalExam();
+  const issues = agValidateFinalExam(gen);
+  if(issues.length){ console.warn("Mock Final Examination validation issues:", issues); }
   const p = appState.data.profile;
   const record = {
     id: agNewRecordId("final"), kind:"final", topics: TOPICS.map(function(t){return t.id;}),
@@ -3891,6 +4114,9 @@ function renderAGQuestionBlock(record, qIndex, container){
   const hintsOn = record.meta.hintsAvailable && record.meta.mode === "Practice Mode";
   container.appendChild(el("p",{class:"topnote"},["Question " + (qIndex+1) + " of " + record.questions.length + " \u2014 " + getTopic(q.topicId).name + " (" + q.subtopic + ") \u2014 " + q.totalMarks + " marks"]));
   container.appendChild(el("p",{},[el("strong",{},[q.commandWord + ": "]), q.stem]));
+  if(q.graphSvg){
+    container.appendChild(el("div",{class:"card", style:"text-align:center; background:#fbfdfd;", html:q.graphSvg}));
+  }
 
   q.parts.forEach(function(part){
     const resp = agGetResponse(record, qIndex, part.label);
@@ -4158,14 +4384,19 @@ function buildQuestionPaperHTML(record){
     html += "<div class='ag-print-question'>";
     html += "<p><strong>Question " + (qi+1) + "</strong> &mdash; " + escapeHTML(q.subtopic) + " (" + q.totalMarks + " marks)</p>";
     html += "<p>" + escapeHTML(q.commandWord) + ": " + escapeHTML(q.stem).replace(/\n/g,"<br>") + "</p>";
+    if(q.graphSvg){ html += "<div style='text-align:center;margin:10px 0;'>" + q.graphSvg + "</div>"; }
     q.parts.forEach(function(part){
       html += "<p style='margin-left:20px;'>(" + part.label + ") " + escapeHTML(part.text) + " <em>[" + part.marks + " mark(s)]</em></p>";
-      for(let i=0;i<3;i++){ html += "<div class='ag-ruled-line'></div>"; }
+      html += "<div class='ag-blank-space' style='height:" + agPrintWorkingHeight(part.marks) + "px;'></div>";
     });
     html += "</div>";
   });
   html += "<p style='text-align:center;font-weight:700;margin-top:20px;'>END OF QUESTIONS</p>";
   return html;
+}
+function agPrintWorkingHeight(marks){
+  // Generous blank space scaled to the expected amount of working, no ruled lines.
+  return Math.max(60, Math.min(220, marks * 28));
 }
 function buildAnswerBookletHTML(record){
   let html = agPaperHeaderHTML(record);
@@ -4175,7 +4406,7 @@ function buildAnswerBookletHTML(record){
     html += "<p><strong>Question " + (qi+1) + "</strong> (" + q.totalMarks + " marks)</p>";
     q.parts.forEach(function(part){
       html += "<p style='margin-left:20px;'>(" + part.label + ") Answer:</p>";
-      for(let i=0;i<5;i++){ html += "<div class='ag-ruled-line'></div>"; }
+      html += "<div class='ag-blank-space' style='height:" + agPrintWorkingHeight(part.marks * 1.4) + "px;'></div>";
     });
     html += "</div>";
   });
@@ -4189,6 +4420,7 @@ function buildMarkingSchemeHTML(record){
   record.questions.forEach(function(q, qi){
     html += "<div class='ag-print-question'>";
     html += "<p><strong>Question " + (qi+1) + "</strong> \u2014 " + escapeHTML(q.subtopic) + " (" + q.totalMarks + " marks)</p>";
+    if(q.graphSvg){ html += "<div style='text-align:center;margin:8px 0;'>" + q.graphSvg + "</div>"; }
     q.parts.forEach(function(part){
       html += "<p style='margin-left:20px;'><strong>(" + part.label + ") [" + part.marks + " mark(s)]</strong></p>";
       html += "<ul>";
