@@ -1800,7 +1800,7 @@ const NAV_ITEMS = [
   {id:"progress", label:"My Progress"},
   {id:"planner", label:"Study Planner"},
   {id:"companion", label:"Learning Companion"},
-  {id:"teacher", label:"Teacher View"},
+  {id:"teacher", label:"Lecturer Review & Learning Report"},
   {id:"help", label:"Help"}
 ];
 
@@ -2217,8 +2217,10 @@ function renderHelp(){
   const card = el("div",{class:"card"});
   card.appendChild(el("h2",{},["Help & About This Hub"]));
   card.appendChild(el("p",{},["This is a self-instructional learning hub for MTCF 0114 (Mathematics I) at the Centre for Foundation Studies, IIUM. It adapts to your diagnostic results, selected topic, learning mode and available time."]));
-  card.appendChild(el("h3",{},["How your data is stored"]));
-  card.appendChild(el("p",{},["All your progress is saved only in this browser's local storage. It is not sent to any server. Using a different browser or device, or clearing your browser data, will remove your saved progress."]));
+  card.appendChild(el("h3",{},["How Your Data Is Stored"]));
+  card.appendChild(el("p",{},["Your learning progress is saved only in this browser's local storage. No learning record is automatically uploaded to a server or lecturer dashboard. For best continuity, use the same device and browser and avoid clearing browser data."]));
+  card.appendChild(el("h3",{},["Lecturer Review"]));
+  card.appendChild(el("p",{},["Lecturer Review & Learning Report allows a lecturer to review the learning record stored on the student's current device. Students may also download their learning report and share it with their lecturer when required."]));
   card.appendChild(el("h3",{},["Navigating the hub"]));
   card.appendChild(el("p",{},["Use the navigation bar at the top to move between Home, Topics, Practice Zone, Common Error Clinic, Assessment Preparation, My Progress, Study Planner and the Learning Companion. On mobile devices, tap the menu icon to open the navigation list."]));
   card.appendChild(el("h3",{},["Need more support?"]));
@@ -3281,6 +3283,8 @@ function renderProgressDashboard(){
   infoGrid.appendChild(statTile("Overall Progress", overall+"%"));
   headerCard.appendChild(infoGrid);
   headerCard.appendChild(el("div",{class:"progressbar-track"},[el("div",{class:"progressbar-fill", style:"width:"+overall+"%"},[])]));
+  headerCard.appendChild(el("div",{class:"btn-row"},[el("button",{class:"btn gold", onclick:exportDataToCSV},["\u{1F4E5} Download My Learning Report"])]));
+  headerCard.appendChild(el("p",{class:"topnote"},["Your learning record is stored on this device. Download your report if you would like to keep a copy or share your progress with your lecturer."]));
   app.appendChild(headerCard);
 
   // Diagnostic results
@@ -3603,12 +3607,12 @@ function companionRespond(prompt, topicId){
 function renderTeacherLogin(){
   const app = qs("#app");
   const card = el("div",{class:"card"});
-  card.appendChild(el("h2",{},["Teacher View"]));
-  card.appendChild(el("p",{},["Enter the access code to view learning records stored on this device."]));
-  card.appendChild(el("p",{class:"topnote"},["Teacher View can only display learning records stored in the current browser and device. Class-wide monitoring requires a secure online database."]));
+  card.appendChild(el("h2",{},["Lecturer Review & Learning Report"]));
+  card.appendChild(el("p",{},["Enter the lecturer access code to review the learning record stored on this device."]));
+  card.appendChild(el("p",{class:"topnote"},["Lecturer Review & Learning Report can only display learning records stored in the current browser and device. Class-wide monitoring requires a secure online database."]));
   const form = el("form",{});
   const fw = el("div",{class:"formfield"});
-  fw.appendChild(el("label",{for:"teacherCode"},["Access code"]));
+  fw.appendChild(el("label",{for:"teacherCode"},["Lecturer access code"]));
   fw.appendChild(el("input",{type:"password", id:"teacherCode", autocomplete:"off"}));
   form.appendChild(fw);
   const errBox = el("div",{});
@@ -3641,19 +3645,21 @@ function renderTeacherDashboard(){
   const app = qs("#app");
   app.innerHTML = "";
   const card = el("div",{class:"card"});
-  card.appendChild(el("div",{class:"section-title"},[el("h2",{style:"margin:0;"},["Teacher View"]), el("button",{class:"btn small outline", style:"margin-left:auto;", onclick:teacherLogout},["Log Out"])]));
-  card.appendChild(el("p",{class:"topnote"},["Teacher View can only display learning records stored in the current browser and device. Class-wide monitoring requires a secure online database. This access code is a simple client-side check, not secure server-side authentication."]));
+  card.appendChild(el("div",{class:"section-title"},[el("h2",{style:"margin:0;"},["Lecturer Review & Learning Report"]), el("button",{class:"btn small outline", style:"margin-left:auto;", onclick:teacherLogout},["Log Out"])]));
+  card.appendChild(el("p",{},["Purpose: This section allows a lecturer to review the learning progress currently stored on this student's device, including diagnostic performance, topic mastery, common errors, assessment records and learning progress."]));
+  card.appendChild(el("p",{class:"topnote"},["Learning records are stored only in this browser and device. Therefore, this section reviews the current student's locally stored learning record and does not provide class-wide remote monitoring."]));
+  card.appendChild(el("p",{class:"topnote"},["A centralised learning analytics dashboard would require a secure online database and user authentication. This access code is a simple client-side check, not secure server-side authentication."]));
   app.appendChild(card);
 
   const p = appState.data.profile;
   const profCard = el("div",{class:"card"});
-  profCard.appendChild(el("h3",{},["Student Profile"]));
+  profCard.appendChild(el("h3",{},["4.1 Student Profile"]));
   if(!p){ profCard.appendChild(el("p",{},["No student profile found on this device."])); app.appendChild(profCard); return; }
   profCard.appendChild(el("p",{},["Name: " + p.name + " | Section: " + p.section + " | Confidence: " + p.confidence]));
   app.appendChild(profCard);
 
   const diagCard = el("div",{class:"card"});
-  diagCard.appendChild(el("h3",{},["Diagnostic Results"]));
+  diagCard.appendChild(el("h3",{},["4.2 Diagnostic Results"]));
   const dTable = el("table",{class:"data-table"});
   dTable.appendChild(el("tr",{},[el("th",{},["Topic"]),el("th",{},["Score"]),el("th",{},["Pathway"])]));
   Object.keys(appState.data.diagnostic).forEach(function(k){
@@ -3664,7 +3670,7 @@ function renderTeacherDashboard(){
   app.appendChild(diagCard);
 
   const masteryCard = el("div",{class:"card"});
-  masteryCard.appendChild(el("h3",{},["Topic Mastery"]));
+  masteryCard.appendChild(el("h3",{},["4.3 Topic Mastery"]));
   const mTable = el("table",{class:"data-table"});
   mTable.appendChild(el("tr",{},[el("th",{},["Topic"]),el("th",{},["Mastery %"]),el("th",{},["Attempts"])]));
   TOPICS.forEach(function(t){
@@ -3681,7 +3687,7 @@ function renderTeacherDashboard(){
   app.appendChild(pracCard);
 
   const errCard = el("div",{class:"card"});
-  errCard.appendChild(el("h3",{},["Common Errors"]));
+  errCard.appendChild(el("h3",{},["4.4 Common Learning Errors"]));
   const errKeys = Object.keys(appState.data.errors);
   if(errKeys.length===0){ errCard.appendChild(el("p",{class:"topnote"},["None recorded."])); }
   else {
@@ -3692,7 +3698,7 @@ function renderTeacherDashboard(){
   app.appendChild(errCard);
 
   const reflCard = el("div",{class:"card"});
-  reflCard.appendChild(el("h3",{},["Reflections"]));
+  reflCard.appendChild(el("h3",{},["4.5 Learning Reflections"]));
   const reflKeys = Object.keys(appState.data.reflections);
   if(reflKeys.length===0){ reflCard.appendChild(el("p",{class:"topnote"},["None recorded."])); }
   else {
@@ -3715,7 +3721,7 @@ function renderTeacherDashboard(){
   app.appendChild(planCard);
 
   const agTeacherCard = el("div",{class:"card"});
-  agTeacherCard.appendChild(el("h3",{},["Assessment Generator Records"]));
+  agTeacherCard.appendChild(el("h3",{},["4.6 Assessment Records"]));
   const agRecords = appState.data.assessmentRecords || [];
   if(agRecords.length === 0){
     agTeacherCard.appendChild(el("p",{class:"topnote"},["No Mock Topic Quizzes, Mock OBTs or Mock Final Examinations generated yet on this device."]));
@@ -3755,7 +3761,7 @@ function renderTeacherDashboard(){
   app.appendChild(agTeacherCard);
 
   const actionsCard = el("div",{class:"card no-print"});
-  actionsCard.appendChild(el("h3",{},["Actions"]));
+  actionsCard.appendChild(el("h3",{},["4.7 Learning Report Actions"]));
   actionsCard.appendChild(el("div",{class:"btn-row"},[
     el("button",{class:"btn", onclick:exportDataToCSV},["Export Student Data as CSV"]),
     el("button",{class:"btn outline", onclick:printProgressReport},["Print Progress Report"]),
