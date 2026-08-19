@@ -474,8 +474,8 @@ const TOPIC_POLYNOMIAL = {
   summary: "This topic covers dividing polynomials, finding zeros, and decomposing rational expressions into partial fractions.",
   outcomes: [
     "Apply the remainder theorem and factor theorem to find real zeros of a polynomial and factorise it completely.",
-    "Identify vertical and horizontal asymptotes of a rational function and determine domain restrictions.",
-    "Decompose a rational expression into partial fractions for distinct, repeated, and irreducible quadratic factors."
+    "Identify proper and improper rational functions and convert an improper rational function into a proper rational expression using polynomial long division.",
+    "Decompose a rational expression into partial fractions for distinct linear, repeated linear, irreducible quadratic, and repeated irreducible quadratic factors."
   ],
   prerequisites: [
     "Long division of numbers",
@@ -485,10 +485,11 @@ const TOPIC_POLYNOMIAL = {
   conceptNote: {
     heading: "Key Ideas in Polynomial and Rational Functions",
     blocks: [
-      { h: "1. Dividing Polynomials", p: "Dividing P(x) by D(x) gives a quotient Q(x) and remainder R(x), where the degree of R(x) is less than the degree of D(x).", formula: "P(x) = Q(x)\u00b7D(x) + R(x)" },
-      { h: "2. Remainder and Factor Theorems", p: "The remainder when P(x) is divided by (x \u2212 a) equals P(a). If P(a) = 0, then (x \u2212 a) is a factor.", formula: "P(a) = 0  \u2194  (x \u2212 a) is a factor of P(x)" },
-      { h: "3. Rational Functions and Asymptotes", p: "Vertical asymptotes occur where the denominator is zero (after cancelling common factors). Horizontal asymptotes depend on the degrees of the numerator and denominator.", formula: "Degree(numerator) < Degree(denominator) \u2192 horizontal asymptote y = 0" },
-      { h: "4. Partial Fractions", p: "A proper rational function can be split into simpler fractions based on the type of factor in the denominator.", formula: "1/[(x\u22121)(x+2)] = A/(x\u22121) + B/(x+2)" }
+      { h: "1. Polynomial Functions", p: "A polynomial function has the form P(x) = a\u2099x\u207f + \u2026 + a\u2081x + a\u2080, where the exponents are non-negative integers. The degree is the highest power of x, and the leading coefficient is the coefficient of the term with the highest degree.", formula: "P(x) = a\u2099x\u207f + \u2026 + a\u2081x + a\u2080  (degree = n, leading coefficient = a\u2099)" },
+      { h: "2. Dividing Polynomials", p: "Dividing P(x) by D(x) gives a quotient Q(x) and remainder R(x), where the degree of R(x) is less than the degree of D(x).", formula: "P(x) = Q(x)\u00b7D(x) + R(x)" },
+      { h: "3. Remainder and Factor Theorems", p: "The remainder when P(x) is divided by (x \u2212 a) equals P(a). If P(a) = 0, then (x \u2212 a) is a factor.", formula: "P(a) = 0  \u2194  (x \u2212 a) is a factor of P(x)" },
+      { h: "4. Rational Functions", p: "A rational function has the form R(x) = P(x)/Q(x), where Q(x) \u2260 0. It is proper if the degree of P(x) is less than the degree of Q(x), and improper if the degree of P(x) is greater than or equal to the degree of Q(x). This matters because partial fraction decomposition can only be applied directly to a proper rational function \u2014 an improper rational function must first be rewritten, using polynomial long division, as a polynomial plus a proper rational function.", formula: "R(x) = P(x)/Q(x), Q(x) \u2260 0.  Improper (deg P \u2265 deg Q) \u2192 long division \u2192 Polynomial + Proper Rational Function" },
+      { h: "5. Partial Fractions", p: "A proper rational function can be decomposed into simpler fractions based on the type of factor in the denominator: distinct linear factors, repeated linear factors, irreducible quadratic factors, and repeated irreducible quadratic factors.", formula: "1/[(x\u22121)(x+2)] = A/(x\u22121) + B/(x+2)" }
     ]
   },
   examples: [
@@ -504,12 +505,24 @@ const TOPIC_POLYNOMIAL = {
     },
     {
       level: "Intermediate",
-      title: "Find vertical and horizontal asymptotes",
+      title: "Identify Proper and Improper Rational Functions",
       steps: [
-        "Question: Find the asymptotes of f(x) = (2x \u2212 1)/(x + 3).",
-        "Step 1: Vertical asymptote: set the denominator to zero: x + 3 = 0 \u2192 x = \u22123.",
-        "Step 2: Horizontal asymptote: the numerator and denominator have the same degree (1), so the horizontal asymptote is the ratio of leading coefficients: y = 2/1 = 2.",
-        "Answer: Vertical asymptote x = \u22123; horizontal asymptote y = 2."
+        "Question: Determine whether f(x) = (3x + 1)/(x\u00b2 \u2212 4) is a proper or improper rational function.",
+        "Step 1: Find the degree of the numerator: 3x + 1 has degree 1.",
+        "Step 2: Find the degree of the denominator: x\u00b2 \u2212 4 has degree 2.",
+        "Step 3: Compare the degrees: since 1 < 2, the numerator's degree is less than the denominator's degree.",
+        "Answer: f(x) is a proper rational function, because degree of numerator (1) < degree of denominator (2)."
+      ]
+    },
+    {
+      level: "Intermediate",
+      title: "Convert an Improper Rational Function to Proper Form",
+      steps: [
+        "Question: Express (x\u00b2 + 3x + 5)/(x + 1) in the form Q(x) + R(x)/D(x) using polynomial long division.",
+        "Step 1: Check whether the function is improper: degree of numerator (2) \u2265 degree of denominator (1), so long division is needed first.",
+        "Step 2: Divide x\u00b2 by x to get the first quotient term x. Multiply: x(x + 1) = x\u00b2 + x. Subtract: (x\u00b2 + 3x + 5) \u2212 (x\u00b2 + x) = 2x + 5.",
+        "Step 3: Divide 2x by x to get the next quotient term +2. Multiply: 2(x + 1) = 2x + 2. Subtract: (2x + 5) \u2212 (2x + 2) = 3.",
+        "Answer: (x\u00b2 + 3x + 5)/(x + 1) = (x + 2) + 3/(x + 1), where x + 2 is the polynomial part Q(x) and 3/(x + 1) is the proper remainder term."
       ]
     },
     {
@@ -530,8 +543,8 @@ const TOPIC_POLYNOMIAL = {
     { id:"poly-d2", difficulty:"basic", skill:"remainder-theorem", errorCategory:"none", question:"Find the remainder when P(x) = x\u00b3 \u2212 2x + 1 is divided by (x \u2212 1).", options:["0","1","\u22122","2"], correctAnswer:"0", explanation:"By the remainder theorem, the remainder equals P(1) = 1 \u2212 2 + 1 = 0.", malayExplanation:"Baki = P(1) mengikut teorem baki." },
     { id:"poly-d3", difficulty:"intermediate", skill:"factor-theorem", errorCategory:"none", question:"Which value of a makes (x \u2212 a) a factor of P(x) = x\u00b2 \u2212 5x + 6?", options:["2","4","\u22122","5"], correctAnswer:"2", explanation:"P(2) = 4 \u221210 + 6 = 0, so a = 2 works (a = 3 also works but is not listed).", malayExplanation:"P(2) = 0, jadi (x\u22122) ialah faktor." },
     { id:"poly-d4", difficulty:"intermediate", skill:"real-zeros", errorCategory:"none", question:"How many real zeros (counted with multiplicity) can a degree-4 polynomial have at most?", options:["4","3","2","5"], correctAnswer:"4", explanation:"A polynomial of degree n has at most n real zeros.", malayExplanation:"Polinomial darjah n mempunyai paling banyak n punca nyata." },
-    { id:"poly-d5", difficulty:"intermediate", skill:"vertical-asymptote", errorCategory:"asymptote-error", question:"Find the vertical asymptote of f(x) = 3/(x + 5).", options:["x = \u22125","x = 5","x = 3","x = 0"], correctAnswer:"x = \u22125", explanation:"Set the denominator to zero: x + 5 = 0 \u2192 x = \u22125.", malayExplanation:"Samakan penyebut dengan sifar." },
-    { id:"poly-d6", difficulty:"challenging", skill:"horizontal-asymptote", errorCategory:"asymptote-error", question:"Find the horizontal asymptote of f(x) = (2x\u00b2 + 1)/(x\u00b2 \u2212 4).", options:["y = 2","y = 0","y = 1/4","No horizontal asymptote"], correctAnswer:"y = 2", explanation:"Since the degrees of numerator and denominator are equal, the asymptote is the ratio of leading coefficients: 2/1 = 2.", malayExplanation:"Darjah sama, jadi asimptot ialah nisbah pekali utama." },
+    { id:"poly-d5", difficulty:"intermediate", skill:"proper-improper", errorCategory:"none", question:"Determine whether f(x) = (3x + 1)/(x\u00b2 \u2212 4) is a proper or improper rational function.", options:["Proper, because degree numerator (1) < degree denominator (2)","Improper, because degree numerator (1) < degree denominator (2)","Improper, because the denominator can be factorised","Proper, because both are polynomials"], correctAnswer:"Proper, because degree numerator (1) < degree denominator (2)", explanation:"Compare the degrees: numerator degree = 1, denominator degree = 2. Since 1 < 2, the function is proper.", malayExplanation:"Bandingkan darjah: darjah pengangka = 1, darjah penyebut = 2. Oleh kerana 1 < 2, fungsi ini wajar." },
+    { id:"poly-d6", difficulty:"challenging", skill:"long-division-conversion", errorCategory:"none", question:"Before decomposing (x\u00b3 + 2x\u00b2 + 1)/(x\u00b2 \u2212 1) into partial fractions, what should be done first?", options:["Perform polynomial long division, because the expression is improper","Factorise the denominator only, then decompose directly","Multiply the numerator and denominator by x","Substitute x = 0 to find a constant term"], correctAnswer:"Perform polynomial long division, because the expression is improper", explanation:"Degree of numerator (3) \u2265 degree of denominator (2), so the expression is improper and must be rewritten using long division as a polynomial plus a proper rational function before partial fractions can be applied.", malayExplanation:"Darjah pengangka (3) \u2265 darjah penyebut (2), jadi bahagian panjang polinomial mesti dilakukan dahulu sebelum pecahan separa." },
     { id:"poly-d7", difficulty:"challenging", skill:"complex-zeros", errorCategory:"none", question:"If 2 + i is a zero of a polynomial with real coefficients, which other value must also be a zero?", options:["2 \u2212 i","\u22122 + i","\u22122 \u2212 i","2 + i (repeated)"], correctAnswer:"2 \u2212 i", explanation:"Complex zeros of polynomials with real coefficients occur in conjugate pairs.", malayExplanation:"Punca kompleks bagi polinomial berpekali nyata datang secara pasangan konjugat." },
     { id:"poly-d8", difficulty:"challenging", skill:"partial-fractions", errorCategory:"none", question:"Which decomposition form is correct for 5/[(x)(x\u00b2+1)]?", options:["A/x + (Bx + C)/(x\u00b2+1)","A/x + B/(x\u00b2+1)","(Ax+B)/x + C/(x\u00b2+1)","A/x\u00b2 + B/(x+1)"], correctAnswer:"A/x + (Bx + C)/(x\u00b2+1)", explanation:"An irreducible quadratic factor requires a linear numerator (Bx + C).", malayExplanation:"Faktor kuadratik tak boleh diuraikan memerlukan pengangka linear (Bx + C)." }
   ],
@@ -540,9 +553,9 @@ const TOPIC_POLYNOMIAL = {
     { id:"poly-p2", difficulty:"basic", skill:"remainder-theorem", question:"Find the remainder when P(x) = x\u00b2 + 3x \u2212 1 is divided by (x + 2).", options:["\u22123","3","1","\u22121"], correctAnswer:"\u22123", explanation:"P(\u22122) = 4 \u22126 \u22121 = \u22123." },
     { id:"poly-p3", difficulty:"basic", skill:"long-division", question:"Divide x\u00b2 + 5x + 6 by (x + 2). What is the quotient?", options:["x + 3","x + 2","x + 6","x \u2212 3"], correctAnswer:"x + 3", explanation:"(x+2)(x+3) = x\u00b2+5x+6, so the quotient is x+3 with no remainder." },
     { id:"poly-p4", difficulty:"intermediate", skill:"factor-theorem", question:"Is (x + 1) a factor of P(x) = x\u00b3 + 2x\u00b2 \u2212 x \u2212 2?", options:["Yes, because P(\u22121) = 0","No, because P(\u22121) = 2","Yes, because P(1) = 0","No, because P(\u22121) = \u22122"], correctAnswer:"Yes, because P(\u22121) = 0", explanation:"P(\u22121) = \u22121 + 2 + 1 \u22122 = 0, so (x+1) is a factor." },
-    { id:"poly-p5", difficulty:"intermediate", skill:"vertical-asymptote", question:"Find the vertical asymptote(s) of f(x) = (x+1)/[(x\u22122)(x+4)].", options:["x = 2 and x = \u22124","x = \u22121","x = 2 only","x = \u22124 only"], correctAnswer:"x = 2 and x = \u22124", explanation:"Both denominator factors give vertical asymptotes, since neither cancels with the numerator." },
+    { id:"poly-p5", difficulty:"intermediate", skill:"proper-improper", question:"Which of the following is an improper rational function?", options:["(x\u00b2 + 3x + 1)/(x + 2)","(2x + 1)/(x\u00b2 + 5)","(x \u2212 4)/(x\u00b2 + 2x + 3)","3/(x\u00b2 + 1)"], correctAnswer:"(x\u00b2 + 3x + 1)/(x + 2)", explanation:"Only (x\u00b2+3x+1)/(x+2) has numerator degree (2) \u2265 denominator degree (1); the other three all have numerator degree less than denominator degree." },
     { id:"poly-p6", difficulty:"intermediate", skill:"domain-rational", question:"What is the domain of f(x) = (x\u22121)/(x\u00b2 \u22129)?", options:["all real x except x=3 and x=\u22123","all real x except x=1","all real x except x=9","all real numbers"], correctAnswer:"all real x except x=3 and x=\u22123", explanation:"Denominator zero at x=\u00b13, so both values are excluded." },
-    { id:"poly-p7", difficulty:"assessment", skill:"horizontal-asymptote", question:"Find the horizontal asymptote of f(x) = (3x + 1)/(x\u00b2 \u2212 1).", options:["y = 0","y = 3","No horizontal asymptote","y = 1"], correctAnswer:"y = 0", explanation:"Degree of numerator (1) is less than degree of denominator (2), so the horizontal asymptote is y=0." },
+    { id:"poly-p7", difficulty:"assessment", skill:"long-division-conversion", question:"Express (x\u00b2 + 3x + 5)/(x + 1) in the form Q(x) + R(x)/D(x) using polynomial long division.", options:["x + 2 + 3/(x + 1)","x + 2 + 5/(x + 1)","x + 3 + 2/(x + 1)","x + 2 \u2212 3/(x + 1)"], correctAnswer:"x + 2 + 3/(x + 1)", explanation:"Dividing x\u00b2+3x+5 by (x+1) gives quotient x+2 and remainder 3, so the result is x+2 + 3/(x+1)." },
     { id:"poly-p8", difficulty:"assessment", skill:"complex-zeros", question:"A degree-3 polynomial with real coefficients has zeros 3 and 1+2i. What is the third zero?", options:["1 \u2212 2i","1 + 2i","\u22123","3i"], correctAnswer:"1 \u2212 2i", explanation:"Complex zeros of real polynomials occur in conjugate pairs, so 1\u22122i must also be a zero." },
     { id:"poly-p9", difficulty:"challenge", skill:"partial-fractions", question:"Which setup is correct for 7/[(x\u22123)\u00b2] partial fraction decomposition?", options:["A/(x\u22123) + B/(x\u22123)\u00b2","A/(x\u22123)","A/(x\u22123)\u00b2 only","(Ax+B)/(x\u22123)\u00b2"], correctAnswer:"A/(x\u22123) + B/(x\u22123)\u00b2", explanation:"A repeated linear factor requires one term for each power up to the multiplicity." },
     { id:"poly-p10", difficulty:"challenge", skill:"proper-improper", question:"Is f(x) = (x\u00b3 + 1)/(x\u00b2 \u2212 1) a proper or improper rational function?", options:["Improper, because numerator degree \u2265 denominator degree","Proper, because it can be simplified","Improper, because the denominator has degree 2","Proper, because both are polynomials"], correctAnswer:"Improper, because numerator degree \u2265 denominator degree", explanation:"Numerator degree (3) is greater than denominator degree (2), making it improper." }
@@ -550,24 +563,24 @@ const TOPIC_POLYNOMIAL = {
   mastery: [
     { id:"poly-m1", difficulty:"basic", skill:"remainder-theorem", question:"Find the remainder when P(x) = 2x\u00b3 \u2212 x + 3 is divided by (x \u2212 1).", options:["4","2","0","6"], correctAnswer:"4", explanation:"P(1) = 2 \u22121 + 3 = 4." },
     { id:"poly-m2", difficulty:"intermediate", skill:"factor-theorem", question:"Factorise P(x) = x\u00b3 \u2212 6x\u00b2 + 11x \u2212 6 completely given that (x\u22121) is a factor.", options:["(x\u22121)(x\u22122)(x\u22123)","(x\u22121)(x+2)(x+3)","(x+1)(x\u22122)(x\u22123)","(x\u22121)\u00b2(x\u22126)"], correctAnswer:"(x\u22121)(x\u22122)(x\u22123)", explanation:"Dividing by (x\u22121) gives x\u00b2\u22125x+6, which factorises to (x\u22122)(x\u22123)." },
-    { id:"poly-m3", difficulty:"intermediate", skill:"asymptotes", question:"Find both asymptotes of f(x) = (x \u2212 1)/(x + 2).", options:["Vertical x=\u22122, horizontal y=1","Vertical x=1, horizontal y=\u22122","Vertical x=2, horizontal y=1","Vertical x=\u22122, horizontal y=0"], correctAnswer:"Vertical x=\u22122, horizontal y=1", explanation:"Denominator zero at x=\u22122; equal degrees give horizontal asymptote y = 1/1 = 1." },
+    { id:"poly-m3", difficulty:"challenge", skill:"partial-fractions", question:"What is the correct partial fraction setup for R(x) = (5x + 1)/(x\u00b2 + 4)\u00b2?", options:["(Ax+B)/(x\u00b2+4) + (Cx+D)/(x\u00b2+4)\u00b2","A/(x\u00b2+4) + B/(x\u00b2+4)\u00b2","(Ax+B)/(x\u00b2+4)\u00b2 only","(Ax+B)/(x\u00b2+4) + C/(x\u00b2+4)\u00b2"], correctAnswer:"(Ax+B)/(x\u00b2+4) + (Cx+D)/(x\u00b2+4)\u00b2", explanation:"A repeated irreducible quadratic factor of power 2 needs a linear numerator (Ax+B or Cx+D) for each power of the factor, up to the maximum power." },
     { id:"poly-m4", difficulty:"assessment", skill:"complex-zeros", question:"Form a quadratic polynomial with zeros 3 + 2i and 3 \u2212 2i.", options:["x\u00b2 \u2212 6x + 13","x\u00b2 + 6x + 13","x\u00b2 \u2212 6x \u2212 13","x\u00b2 \u2212 3x + 13"], correctAnswer:"x\u00b2 \u2212 6x + 13", explanation:"Sum of roots = 6, product of roots = 9+4=13, so x\u00b2 \u2212 6x + 13." },
     { id:"poly-m5", difficulty:"challenge", skill:"partial-fractions", question:"Decompose 1/[(x\u22121)(x+1)] into partial fractions.", options:["\u00bd/(x\u22121) \u2212 \u00bd/(x+1)","1/(x\u22121) + 1/(x+1)","\u00bd/(x\u22121) + \u00bd/(x+1)","1/(x\u22121) \u2212 1/(x+1)"], correctAnswer:"\u00bd/(x\u22121) \u2212 \u00bd/(x+1)", explanation:"1 = A(x+1) + B(x\u22121). Setting x=1 gives A=\u00bd; setting x=\u22121 gives B=\u2212\u00bd." }
   ],
   commonErrors: [
     {
-      id:"poly-e1", title:"Cancelling terms incorrectly when finding asymptotes",
-      wrongMethod:"For f(x) = (x\u00b2 \u2212 4)/(x \u2212 2), a student cancels to get f(x) = x + 2 and says there is no vertical asymptote and no restriction at all.",
-      why:"Although (x\u22122) cancels algebraically, x = 2 is still excluded from the domain because the original denominator is zero there \u2014 this creates a hole, not a normal point.",
-      correctMethod:"After cancelling, f(x) = x + 2 but with a hole at x = 2 (the point (2, 4) is missing from the graph); there is no vertical asymptote, but the restriction x \u2260 2 remains.",
-      practice:{ question:"For f(x) = (x\u00b2 \u2212 9)/(x \u2212 3), what happens at x = 3?", options:["There is a hole at x = 3, not a normal point","There is a vertical asymptote at x = 3","The function is defined normally at x = 3","There is a horizontal asymptote at x = 3"], correctAnswer:"There is a hole at x = 3, not a normal point", explanation:"The factor (x\u22123) cancels, leaving a removable discontinuity (hole), not an asymptote." }
+      id:"poly-e1", title:"Misclassifying a rational function without comparing degrees",
+      wrongMethod:"For f(x) = (x\u00b3 + 1)/(x\u00b2 + 5x + 6), a student says the function is proper because the denominator 'looks more complicated' than the numerator.",
+      why:"Whether a rational function is proper or improper depends only on comparing the highest power (degree) of the numerator and denominator, not on which expression has more terms or looks more complex.",
+      correctMethod:"Compare degrees: numerator degree = 3, denominator degree = 2. Since 3 \u2265 2, the function is improper.",
+      practice:{ question:"Is f(x) = (x\u00b2 + 3x + 2)/(x + 1) proper or improper?", options:["Improper, because degree numerator (2) \u2265 degree denominator (1)","Proper, because the denominator has fewer terms","Improper, because the denominator is linear","Proper, because it can be factorised"], correctAnswer:"Improper, because degree numerator (2) \u2265 degree denominator (1)", explanation:"Compare degrees: 2 \u2265 1, so the function is improper." }
     },
     {
-      id:"poly-e2", title:"Incorrect asymptote identification when degrees are equal",
-      wrongMethod:"For f(x) = (2x\u00b2 + 1)/(x\u00b2 \u2212 4), a student concludes there is no horizontal asymptote because both are degree 2.",
-      why:"When the numerator and denominator have the same degree, there IS a horizontal asymptote \u2014 it equals the ratio of the leading coefficients, not 'none'.",
-      correctMethod:"Since both degrees are 2, the horizontal asymptote is y = 2/1 = 2 (ratio of leading coefficients).",
-      practice:{ question:"Find the horizontal asymptote of f(x) = (5x\u00b2 \u2212 1)/(2x\u00b2 + 3).", options:["y = 5/2","No horizontal asymptote","y = 0","y = 2/5"], correctAnswer:"y = 5/2", explanation:"Equal degrees: the asymptote is the ratio of leading coefficients, 5/2." }
+      id:"poly-e2", title:"Skipping long division before decomposing an improper rational function",
+      wrongMethod:"For f(x) = (x\u00b2 + 5x + 7)/(x + 2), a student sets up partial fractions directly as A/(x + 2) without first checking whether the function is proper.",
+      why:"Partial fraction decomposition only applies directly to a proper rational function. Since this function is improper (numerator degree 2 \u2265 denominator degree 1), polynomial long division must be performed first to rewrite it as a polynomial plus a proper remainder term.",
+      correctMethod:"Divide first: (x\u00b2 + 5x + 7)/(x + 2) = (x + 3) + 1/(x + 2). Only the proper remainder term, 1/(x + 2), would need further decomposition if its denominator had more than one factor.",
+      practice:{ question:"Before decomposing (x\u00b2 + 4x + 9)/(x + 3) into partial fractions, what must be done first?", options:["Perform polynomial long division, since the function is improper","Set up A/(x + 3) directly","Multiply the numerator and denominator by (x + 3)","Factorise the numerator only"], correctAnswer:"Perform polynomial long division, since the function is improper", explanation:"Degree of numerator (2) \u2265 degree of denominator (1), so long division is required before partial fractions can be applied." }
     },
     {
       id:"poly-e3", title:"Wrong partial fraction setup for a repeated factor",
@@ -577,7 +590,7 @@ const TOPIC_POLYNOMIAL = {
       practice:{ question:"What is the correct partial fraction setup for 3/(x\u22121)\u00b3?", options:["A/(x\u22121) + B/(x\u22121)\u00b2 + C/(x\u22121)\u00b3","A/(x\u22121)\u00b3 only","A/(x\u22121)\u00b3 + B/(x\u22121)","(Ax+B)/(x\u22121)\u00b3"], correctAnswer:"A/(x\u22121) + B/(x\u22121)\u00b2 + C/(x\u22121)\u00b3", explanation:"A repeated factor to the power 3 needs three terms, one for each power 1, 2, and 3." }
     }
   ],
-  malayNote: "Apabila darjah pengangka dan penyebut adalah sama, asimptot mengufuk wujud dan sama dengan nisbah pekali utama. Faktor berulang dalam pecahan separa memerlukan satu sebutan bagi setiap kuasa sehingga kuasa maksimum."
+  malayNote: "Fungsi nisbah dikatakan tak wajar (improper) jika darjah pengangka lebih besar atau sama dengan darjah penyebut; dalam kes ini, bahagian panjang polinomial mesti dilakukan dahulu sebelum pecahan separa. Faktor berulang dalam pecahan separa memerlukan satu sebutan bagi setiap kuasa sehingga kuasa maksimum."
 };
 
 const TOPIC_EXPLOG = {
@@ -1177,25 +1190,54 @@ const AG_TEMPLATES = {
         ]
       };
     },
-    function tplAsymptotes(){
-      const m = agRandNonZero(-4,4), n = agRandInt(-6,6), p = agRandNonZero(-4,4), q = agRandInt(-6,6);
-      const va = agFracStr(-q, p);
-      const ha = agFracStr(m, p);
+    function tplProperOrImproper(){
+      // Randomly build either a proper or an improper rational function.
+      const isImproper = agRandInt(0,1) === 1;
+      let numStr, denomStr, numDeg, denDeg;
+      function fmtLeadQuad(a){
+        if(a===1) return "x\u00b2";
+        if(a===-1) return "\u2212x\u00b2";
+        return (a<0 ? "\u2212" + Math.abs(a) : String(a)) + "x\u00b2";
+      }
+      function fmtQuadTerm(coef, varStr){
+        if(coef===0) return "";
+        const sign = coef>=0 ? "+" : "\u2212";
+        const abs = Math.abs(coef);
+        const mag = (varStr && abs===1) ? "" : String(abs);
+        return " " + sign + " " + mag + varStr;
+      }
+      if(isImproper){
+        // Numerator degree 2, denominator degree 1: (ax^2+bx+c) / (dx+e)
+        const a = agRandNonZero(-4,4), b = agRandInt(-6,6), c = agRandInt(-8,8);
+        const d = agRandNonZero(-3,3), e = agRandInt(-5,5);
+        numStr = fmtLeadQuad(a) + fmtQuadTerm(b,"x") + fmtQuadTerm(c,"");
+        denomStr = "(" + agFmtLinear(d,e) + ")";
+        numDeg = 2; denDeg = 1;
+      } else {
+        // Numerator degree 1, denominator degree 2: (ax+b) / (x-p)(x-q)
+        const a = agRandNonZero(-4,4), b = agRandInt(-6,6);
+        const roots = agPickDistinct(-5,5,2);
+        numStr = agFmtLinear(a,b);
+        denomStr = "(x " + agSignedStr(-roots[0]) + ")(x " + agSignedStr(-roots[1]) + ")";
+        numDeg = 1; denDeg = 2;
+      }
+      const classification = isImproper ? "improper" : "proper";
+      const comparison = isImproper ? "\u2265" : "<";
       return {
-        topicId:"polynomial", subtopic:"Rational Functions and Asymptotes", difficulty:"assessment", commandWord:"Determine",
-        skillTag:"asymptotes", errorTag:"asymptote-error",
-        stem: "Consider the rational function h(x) = (" + agFmtLinear(m,n) + ") / (" + agFmtLinear(p,q) + ").",
+        topicId:"polynomial", subtopic:"Proper and Improper Rational Functions", difficulty:"intermediate", commandWord:"Determine",
+        skillTag:"proper-improper", errorTag:"none",
+        stem: "Consider the rational function f(x) = (" + numStr + ") / " + denomStr + ".",
         parts:[
-          { label:"a", text:"Find the equation of the vertical asymptote.", marks:2, type:"expression",
-            accepted:[normaliseAnswer("x="+va)],
-            hint:"Set the denominator equal to zero and solve for x.",
-            marking:["Denominator correctly set to zero (1)","Correct vertical asymptote stated (1)"],
-            solution:"Set the denominator to zero: " + agFmtLinear(p,q) + " = 0, giving x = " + va + ". So the vertical asymptote is x = " + va + "." },
-          { label:"b", text:"Find the equation of the horizontal asymptote.", marks:2, type:"expression",
-            accepted:[normaliseAnswer("y="+ha)],
-            hint:"Since the numerator and denominator have the same degree, compare the leading coefficients.",
-            marking:["Recognises equal degrees (1)","Correct horizontal asymptote stated (1)"],
-            solution:"Since the numerator and denominator are both degree 1, the horizontal asymptote is the ratio of leading coefficients: y = " + m + "/" + p + " = " + ha + "." }
+          { label:"a", text:"State the degree of the numerator and the degree of the denominator.", marks:2, type:"expression",
+            accepted:[normaliseAnswer("numerator="+numDeg+",denominator="+denDeg)],
+            hint:"The degree is the highest power of x in each part.",
+            marking:["Correct numerator degree (1)","Correct denominator degree (1)"],
+            solution:"Degree of numerator = " + numDeg + "; degree of denominator = " + denDeg + "." },
+          { label:"b", text:"Hence, state whether f(x) is a proper or improper rational function, giving a reason.", marks:2, type:"expression",
+            accepted:[normaliseAnswer(classification)],
+            hint:"Compare the two degrees: proper means numerator degree < denominator degree; improper means numerator degree \u2265 denominator degree.",
+            marking:["Correct classification (1)","Correct reason comparing degrees (1)"],
+            solution:"Since " + numDeg + " " + comparison + " " + denDeg + ", f(x) is " + classification + "." }
         ]
       };
     },
@@ -1226,6 +1268,46 @@ const AG_TEMPLATES = {
             hint:"Substitute your values of A and B from part (a) into A/(x " + agSignedStr(-p) + ") + B/(x " + agSignedStr(-q) + ").",
             marking:["Correct decomposition with both constants substituted correctly (2)"],
             solution:"(" + numStr + ") / " + denomStr + " = " + decompStr + "." }
+        ]
+      };
+    },
+    function tplConvertImproperToProper(){
+      // Build (x-k)(x+m)+r so long division comes out exactly, with k, m, r integers.
+      const k = agRandNonZero(-5,5);
+      const m = agRandInt(-5,5);
+      const r = agRandNonZero(-6,6);
+      const bCoef = m - k;
+      const cConst = r - k*m;
+      function fmtQuadTerm(coef, varStr){
+        if(coef===0) return "";
+        const sign = coef>=0 ? "+" : "\u2212";
+        const abs = Math.abs(coef);
+        const mag = (varStr && abs===1) ? "" : String(abs);
+        return " " + sign + " " + mag + varStr;
+      }
+      function fmtSignedTerm(n){
+        return n>=0 ? ("+ " + n) : ("\u2212 " + Math.abs(n));
+      }
+      const numStr = "x\u00b2" + fmtQuadTerm(bCoef,"x") + fmtQuadTerm(cConst,"");
+      const denomStr = "(x " + agSignedStr(-k) + ")";
+      const quotStr = agFmtLinear(1, m);
+      const remStr = r>=0 ? String(r) : ("\u2212" + Math.abs(r));
+      const finalExpr = quotStr + " " + fmtSignedTerm(r) + "/" + denomStr;
+      return {
+        topicId:"polynomial", subtopic:"Converting Improper to Proper Rational Functions", difficulty:"assessment", commandWord:"Express",
+        skillTag:"long-division-conversion", errorTag:"none",
+        stem: "Express (" + numStr + ") / " + denomStr + " in the form Q(x) + R(x)/D(x) using polynomial long division.",
+        parts:[
+          { label:"a", text:"Perform the polynomial long division to find the quotient and remainder.", marks:3, type:"expression",
+            accepted:[normaliseAnswer("quotient="+quotStr+",remainder="+r)],
+            hint:"Divide the leading term of the numerator by the leading term of the denominator, multiply and subtract, then repeat.",
+            marking:["Correct first quotient term (1)","Correct subtraction step (1)","Correct quotient and remainder stated (1)"],
+            solution:"Dividing (" + numStr + ") by " + denomStr + " gives quotient " + quotStr + " with remainder " + remStr + "." },
+          { label:"b", text:"Hence, write the result in the form Q(x) + R(x)/D(x).", marks:1, type:"expression",
+            accepted:[normaliseAnswer(finalExpr)],
+            hint:"Combine the quotient from part (a) with the remainder over the original denominator.",
+            marking:["Correct final expression (1)"],
+            solution:"(" + numStr + ") / " + denomStr + " = " + finalExpr + "." }
         ]
       };
     }
@@ -1517,7 +1599,7 @@ function agScaleQuestionsToTarget(questions, targetTotal){
 let AG_LAST_SIGNATURE = null;
 
 // Skill tags that represent an interval / domain / validity restriction.
-const AG_DOMAIN_SKILLS = ["inequality-sign-reversal", "domain-restriction", "asymptotes", "log-equations"];
+const AG_DOMAIN_SKILLS = ["inequality-sign-reversal", "domain-restriction", "log-equations"];
 // Skill tags that represent an exact-value question (a dedicated exact-value question,
 // or the graph-interpretation question, which also requires reading an exact value).
 const AG_EXACT_VALUE_SKILLS = ["reference-angle", "trig-graph-interpretation"];
