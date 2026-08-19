@@ -130,10 +130,14 @@ main#app{max-width:1100px; margin:0 auto; padding:20px 16px 60px;}
 .option-card.selected{border-color:var(--turquoise); background:var(--purple-tint); font-weight:700; box-shadow:0 2px 10px rgba(139,49,224,0.15);}
 .option-card:hover{border-color:var(--turquoise); transform:translateY(-1px); box-shadow:0 4px 12px rgba(139,49,224,0.12);}
 
-.quiz-option{display:block; width:100%; text-align:left; border:2px solid var(--line); background:#fff; border-radius:9px; padding:12px 14px; margin-bottom:8px; font-size:14px; transition:border-color .15s, transform .15s;}
+.quiz-option{display:block; width:100%; text-align:left; border:2px solid var(--line); background:#fff; color:var(--charcoal); border-radius:9px; padding:12px 14px; margin-bottom:8px; font-size:14px; transition:border-color .15s, background .15s, color .15s, transform .15s, box-shadow .15s;}
 .quiz-option:hover{border-color:var(--turquoise); transform:translateX(2px);}
-.quiz-option.correct{border-color:var(--success); background:var(--success-tint); font-weight:700;}
-.quiz-option.incorrect{border-color:var(--danger); background:var(--danger-tint); font-weight:700;}
+.quiz-option.selected{border-color:var(--turquoise-dark); background:linear-gradient(120deg,#8B31E0,#6D28D9); color:#fff; font-weight:700; box-shadow:0 4px 12px rgba(107,40,217,0.28);}
+.quiz-option.selected:hover{border-color:var(--turquoise-dark); background:linear-gradient(120deg,#9333EA,#6D28D9); color:#fff;}
+.quiz-option.correct{border-color:var(--success); background:var(--success-tint); color:var(--charcoal); font-weight:700;}
+.quiz-option.incorrect{border-color:var(--danger); background:var(--danger-tint); color:var(--charcoal); font-weight:700;}
+.quiz-option.correct:hover{border-color:var(--success); background:var(--success-tint); color:var(--charcoal);}
+.quiz-option.incorrect:hover{border-color:var(--danger); background:var(--danger-tint); color:var(--charcoal);}
 .quiz-option .qicon{margin-right:8px; font-weight:700;}
 
 .feedback-box{padding:12px 14px; border-radius:9px; margin-top:12px; font-size:14px;}
@@ -2497,7 +2501,7 @@ function renderIndependentPractice(topic, tp){
       const b = el("button",{type:"button", class:"quiz-option", onclick:function(){
         qsa(".quiz-option", optWrap).forEach(function(o){ o.classList.remove("selected"); o.style.borderColor=""; });
         selected = opt;
-        b.style.borderColor = "var(--turquoise)";
+        b.classList.add("selected");
       }},[opt]);
       optWrap.appendChild(b);
     });
@@ -2555,8 +2559,8 @@ function renderTopicCommonMistakes(topic){
     let sel = null;
     shuffled.forEach(function(opt){
       const b = el("button",{type:"button", class:"quiz-option", onclick:function(){
-        qsa(".quiz-option", optWrap).forEach(function(o){ o.style.borderColor=""; });
-        sel = opt; b.style.borderColor="var(--turquoise)";
+        qsa(".quiz-option", optWrap).forEach(function(o){ o.classList.remove("selected"); o.style.borderColor=""; });
+        sel = opt; b.classList.add("selected");
       }},[opt]);
       optWrap.appendChild(b);
     });
@@ -2624,9 +2628,9 @@ function renderMasteryQuestion(){
   shuffled.forEach(function(opt){
     const optBtn = el("button",{type:"button", class:"quiz-option", onclick:function(ev){
       if(sess.answered) return;
-      qsa(".quiz-option", optWrap).forEach(function(o){ o.style.borderColor=""; });
+      qsa(".quiz-option", optWrap).forEach(function(o){ o.classList.remove("selected"); o.style.borderColor=""; });
       selected = opt;
-      ev.currentTarget.style.borderColor = "var(--turquoise)";
+      ev.currentTarget.classList.add("selected");
     }},[opt]);
     optWrap.appendChild(optBtn);
   });
@@ -2792,9 +2796,9 @@ function renderDiagnosticQuestion(){
   const optWrap = el("div",{});
   q.shuffledOptions.forEach(function(opt){
     const b = el("button",{type:"button", class:"quiz-option", onclick:function(ev){
-      qsa(".quiz-option",optWrap).forEach(function(o){o.style.borderColor="";});
+      qsa(".quiz-option",optWrap).forEach(function(o){o.classList.remove("selected"); o.style.borderColor="";});
       selected = opt;
-      ev.currentTarget.style.borderColor = "var(--turquoise)";
+      ev.currentTarget.classList.add("selected");
     }},[opt]);
     optWrap.appendChild(b);
   });
@@ -2966,8 +2970,8 @@ function renderErrorClinic(){
     let selected = null;
     options.forEach(function(opt){
       const b = el("button",{type:"button", class:"quiz-option", onclick:function(ev){
-        qsa(".quiz-option",optWrap).forEach(function(o){o.style.borderColor="";});
-        selected = opt; ev.currentTarget.style.borderColor="var(--turquoise)";
+        qsa(".quiz-option",optWrap).forEach(function(o){o.classList.remove("selected"); o.style.borderColor="";});
+        selected = opt; ev.currentTarget.classList.add("selected");
       }},[opt]);
       optWrap.appendChild(b);
     });
@@ -2986,8 +2990,8 @@ function renderErrorClinic(){
       let pSel = null;
       shuffle(err.practice.options).forEach(function(opt){
         const pb = el("button",{type:"button", class:"quiz-option", onclick:function(ev){
-          qsa(".quiz-option",pOptWrap).forEach(function(o){o.style.borderColor="";});
-          pSel = opt; ev.currentTarget.style.borderColor="var(--turquoise)";
+          qsa(".quiz-option",pOptWrap).forEach(function(o){o.classList.remove("selected"); o.style.borderColor="";});
+          pSel = opt; ev.currentTarget.classList.add("selected");
         }},[opt]);
         pOptWrap.appendChild(pb);
       });
@@ -3089,8 +3093,8 @@ function renderPracticeQuestion(){
   q.shuffledOptions.forEach(function(opt){
     const b = el("button",{type:"button", class:"quiz-option", onclick:function(ev){
       if(sess.answered) return;
-      qsa(".quiz-option",optWrap).forEach(function(o){o.style.borderColor="";});
-      selected = opt; ev.currentTarget.style.borderColor="var(--turquoise)";
+      qsa(".quiz-option",optWrap).forEach(function(o){o.classList.remove("selected"); o.style.borderColor="";});
+      selected = opt; ev.currentTarget.classList.add("selected");
     }},[opt]);
     optWrap.appendChild(b);
   });
@@ -3248,11 +3252,10 @@ function renderAssessmentQuestion(){
   let selected = sess.answers[sess.index] ? sess.answers[sess.index].selected : null;
   const optWrap = el("div",{});
   q.shuffledOptions.forEach(function(opt){
-    const b = el("button",{type:"button", class:"quiz-option"+(selected===opt?"":""), onclick:function(ev){
-      qsa(".quiz-option",optWrap).forEach(function(o){o.style.borderColor="";});
-      selected = opt; ev.currentTarget.style.borderColor="var(--turquoise)";
+    const b = el("button",{type:"button", class:"quiz-option"+(selected===opt?" selected":""), onclick:function(ev){
+      qsa(".quiz-option",optWrap).forEach(function(o){o.classList.remove("selected"); o.style.borderColor="";});
+      selected = opt; ev.currentTarget.classList.add("selected");
     }},[opt]);
-    if(selected===opt) b.style.borderColor="var(--turquoise)";
     optWrap.appendChild(b);
   });
   card.appendChild(optWrap);
