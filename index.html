@@ -7,6 +7,20 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+window.MathJax = {
+  tex: {
+    inlineMath: [['\\(', '\\)']],
+    displayMath: [['\\[', '\\]']],
+    processEscapes: true
+  },
+  options: {
+    skipHtmlTags: ['script','noscript','style','textarea','pre','code']
+  },
+  startup: { typeset: false }
+};
+</script>
+<script id="MathJax-script" defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" onload="if(window.scheduleMathTypeset){scheduleMathTypeset(document.body);}"></script>
 <style>
 
 /* P-SIM design system. Compatibility tokens retain existing renderer references. */
@@ -273,6 +287,30 @@ body.modal-open,body.drawer-open {overflow:hidden;}
   .site-footer {padding:24px 16px;}
 }
 @media(prefers-reduced-motion:reduce) {html {scroll-behavior:auto;} *,*::before,*::after {animation:none!important; transition:none!important; scroll-behavior:auto!important;}}
+/* Professional mathematical typesetting. */
+.math-content, .formula, .step, .feedback-box, .hint-content, .quiz-option, .option-card, .companion-msg,
+#agQuestionContainer, #agPrintArea, .modal-box, .data-table td, .data-table th { min-width:0; }
+mjx-container { color:inherit; max-width:100%; }
+mjx-container[jax="CHTML"][display="true"] {
+  display:block;
+  max-width:100%;
+  overflow-x:auto;
+  overflow-y:hidden;
+  padding:.2rem .1rem;
+  margin:.6rem 0!important;
+  -webkit-overflow-scrolling:touch;
+}
+.formula mjx-container[jax="CHTML"][display="true"] { margin:.15rem 0!important; }
+.quiz-option mjx-container, .option-card mjx-container, .btn mjx-container { pointer-events:none; }
+:root[data-theme="dark"] mjx-container { color:var(--charcoal); }
+@media(max-width:600px) {
+  mjx-container { font-size:96%!important; }
+  mjx-container[jax="CHTML"][display="true"] { padding-bottom:.35rem; }
+}
+@media print {
+  mjx-container { color:#000!important; }
+  mjx-container[jax="CHTML"][display="true"] { overflow:visible!important; max-width:none!important; }
+}
 /* Preserve separate print paper and report flows. */
 #agPrintArea {display:none;}
 body.ag-printing {overflow:auto; background:#fff;}
@@ -1932,6 +1970,287 @@ function logActivity(text){
   saveStudentData();
 }
 
+/* ---------- Mathematical display layer (MathJax 3) ----------
+   IMPORTANT: source question/answer values remain unchanged. This layer only
+   converts user-facing copies to TeX delimiters for rendering. */
+const MATHJAX_INLINE_OPEN = "\\(";
+const MATHJAX_INLINE_CLOSE = "\\)";
+const MATHJAX_DISPLAY_OPEN = "\\[";
+const MATHJAX_DISPLAY_CLOSE = "\\]";
+let mathTypesetQueued = false;
+
+function containsMathDelimiter(root){
+  if(!root) return false;
+  const text = root.textContent || "";
+  return text.indexOf(MATHJAX_INLINE_OPEN) !== -1 || text.indexOf(MATHJAX_DISPLAY_OPEN) !== -1;
+}
+
+function typesetMath(root){
+  if(!window.MathJax || typeof MathJax.typesetPromise !== "function") return Promise.resolve();
+  const target = root || document.body;
+  if(!containsMathDelimiter(target)) return Promise.resolve();
+  return MathJax.typesetPromise([target]).catch(function(err){ console.warn("MathJax typesetting warning:", err); });
+}
+
+function scheduleMathTypeset(root){
+  if(mathTypesetQueued) return;
+  mathTypesetQueued = true;
+  requestAnimationFrame(function(){
+    mathTypesetQueued = false;
+    typesetMath(root || document.body);
+  });
+}
+
+function mathSuperscriptToLatex(seq){
+  const map = {"⁰":"0","¹":"1","²":"2","³":"3","⁴":"4","⁵":"5","⁶":"6","⁷":"7","⁸":"8","⁹":"9","ⁿ":"n","⁻":"-","⁺":"+"};
+  return seq.split("").map(function(ch){ return map[ch] !== undefined ? map[ch] : ch; }).join("");
+}
+function mathSubscriptToLatex(seq){
+  const map = {"₀":"0","₁":"1","₂":"2","₃":"3","₄":"4","₅":"5","₆":"6","₇":"7","₈":"8","₉":"9","ₐ":"a","ₑ":"e","ₒ":"o","ₓ":"x","ₙ":"n"};
+  return seq.split("").map(function(ch){ return map[ch] !== undefined ? map[ch] : ch; }).join("");
+}
+
+function isMatrixBody(body){
+  if(body.indexOf(",") !== -1) return false;
+  const rows = body.split(";");
+  const tokens = [];
+  rows.forEach(function(row){ row.trim().split(/\s+/).forEach(function(t){ if(t) tokens.push(t); }); });
+  if(tokens.length < 1) return false;
+  return tokens.every(function(t){
+    return t === "|" || /^[−-]?(?:\d+(?:\/\d+)?|[A-Za-z](?:[²³⁴⁵⁶⁷⁸⁹])?)$/.test(t);
+  });
+}
+
+function convertMatricesToLatex(input){
+  return input.replace(/\[([^\[\]]+)\]/g, function(full, body){
+    if(!isMatrixBody(body)) return full;
+    const rows = body.split(";").map(function(row){
+      return row.trim().split(/\s+/).filter(Boolean).map(function(token){
+        if(token === "|") return "\\mid";
+        return plainMathToLatex(token, true);
+      }).join(" & ");
+    });
+    return "\\begin{bmatrix}" + rows.join(" \\\\ ") + "\\end{bmatrix}";
+  });
+}
+
+function convertSquareRootsToLatex(input){
+  let s = input;
+  // Repeated pass handles simple nested parenthesised roots without a full parser.
+  for(let i=0;i<3;i++){
+    s = s.replace(/√\(([^()]*)\)/g, function(_, inside){ return "\\sqrt{" + inside + "}"; });
+  }
+  s = s.replace(/√\s*([−-]?(?:\d+(?:\.\d+)?|[A-Za-z](?:[²³⁴⁵⁶⁷⁸⁹])?))/g, function(_, atom){ return "\\sqrt{" + atom + "}"; });
+  return s;
+}
+
+function convertFractionsToLatex(input){
+  let s = input;
+  // Parenthesised rational expressions first.
+  s = s.replace(/\(([^()]+)\)\s*\/\s*\(([^()]+)\)/g, function(_, n, d){ return "\\frac{" + n + "}{" + d + "}"; });
+  s = s.replace(/([−-]?\d+)\s*\/\s*\(([^()]+)\)/g, function(_, n, d){ return "\\frac{" + n + "}{" + d + "}"; });
+  s = s.replace(/\(([^()]+)\)\s*\/\s*([−-]?\d+|[A-Za-z])/g, function(_, n, d){ return "\\frac{" + n + "}{" + d + "}"; });
+  s = s.replace(/([−-]?\d+|[A-Za-z])\s*\/\s*(\\sqrt\{[^{}]+\})/g, function(_, n, d){ return "\\frac{" + n + "}{" + d + "}"; });
+  s = s.replace(/([−-]?\d+|[A-Za-z])\s*\/\s*\[([^\]]+)\]/g, function(_, n, d){ return "\\frac{" + n + "}{" + d + "}"; });
+  // Simple numeric/symbolic fractions (e.g. 7/3, T/4, π/2).
+  s = s.replace(/([−-]?\d+|[A-Za-z]|π)\s*\/\s*(\d+|[A-Za-z])/g, function(_, n, d){
+    if(n.charAt(0) === "−" || n.charAt(0) === "-") return "-\\frac{" + n.slice(1) + "}{" + d + "}";
+    return "\\frac{" + n + "}{" + d + "}";
+  });
+  return s;
+}
+
+function plainMathToLatex(expr, nested){
+  let s = String(expr === null || expr === undefined ? "" : expr).trim();
+  if(!s) return s;
+  if(!nested) s = convertMatricesToLatex(s);
+  s = convertSquareRootsToLatex(s);
+  s = convertFractionsToLatex(s);
+
+  s = s.replace(/([A-Za-z0-9\)\]])([⁰¹²³⁴⁵⁶⁷⁸⁹ⁿ⁻⁺]+)/g, function(_, base, sup){
+    return base + "^{" + mathSuperscriptToLatex(sup) + "}";
+  });
+  s = s.replace(/([A-Za-z])([₀₁₂₃₄₅₆₇₈₉ₐₑₒₓₙ]+)/g, function(_, base, sub){
+    return base + "_{" + mathSubscriptToLatex(sub) + "}";
+  });
+  s = s.replace(/\^\(([^()]*)\)/g, function(_, power){ return "^{" + power + "}"; });
+  s = s.replace(/\^([−-]?[A-Za-z0-9]+)/g, function(_, power){ return "^{" + power + "}"; });
+
+  s = s.replace(/\|([^|]+)\|/g, function(_, inside){ return "\\left|" + inside + "\\right|"; });
+  s = s.replace(/(\d+(?:\.\d+)?)°/g, "$1^{\\circ}");
+  s = s.replace(/…/g, "\\cdots ");
+
+  s = s.replace(/\blog(?=\s*(?:_|\())/g, "\\log");
+  s = s.replace(/\bln\b/g, "\\ln");
+  s = s.replace(/\bsin\b/g, "\\sin");
+  s = s.replace(/\bcos\b/g, "\\cos");
+  s = s.replace(/\btan\b/g, "\\tan");
+  s = s.replace(/\bsec\b/g, "\\sec");
+  s = s.replace(/\bcsc\b/g, "\\csc");
+  s = s.replace(/\bcot\b/g, "\\cot");
+
+  s = s.replace(/−/g, "-");
+  s = s.replace(/±/g, "\\pm ");
+  s = s.replace(/≤/g, "\\le ");
+  s = s.replace(/≥/g, "\\ge ");
+  s = s.replace(/≠/g, "\\ne ");
+  s = s.replace(/∞/g, "\\infty ");
+  s = s.replace(/∪/g, "\\cup ");
+  s = s.replace(/∩/g, "\\cap ");
+  s = s.replace(/∈/g, "\\in ");
+  s = s.replace(/π/g, "\\pi ");
+  s = s.replace(/θ/g, "\\theta ");
+  s = s.replace(/×/g, "\\times ");
+  s = s.replace(/·/g, "\\cdot ");
+  s = s.replace(/÷/g, "\\div ");
+  s = s.replace(/→/g, "\\to ");
+  s = s.replace(/⇒/g, "\\Rightarrow ");
+  s = s.replace(/⇔/g, "\\Longleftrightarrow ");
+  s = s.replace(/</g, "\\lt ");
+  s = s.replace(/>/g, "\\gt ");
+
+  // Short connectors that legitimately occur between expressions.
+  s = s.replace(/\s+or\s+/gi, "\\quad\\text{or}\\quad ");
+  s = s.replace(/\s+and\s+/gi, "\\quad\\text{and}\\quad ");
+  s = s.replace(/\s+then\s+/gi, "\\quad\\text{then}\\quad ");
+
+  return s.replace(/\s+/g, " ").trim();
+}
+
+function hasMathCue(text){
+  const s = String(text || "");
+  return /[²³⁴⁵⁶⁷⁸⁹ⁿ⁻¹₀₁₂₃₄₅₆₇₈₉√±≤≥≠∞∪∩∈πθ×·→⇒⇔−°…]/.test(s) ||
+    /(?:^|[\s(])(?:\b[A-Za-z]\b|[A-Za-z]{1,3}(?=[²³⁴⁵⁶⁷⁸⁹ⁿ^])|[fghPQR](?:⁻¹)?\([^)]*\)|[A-Za-z][₀₁₂₃₄₅₆₇₈₉]+|[−-]?\d+[A-Za-z]+)\s*(?:=|<|>|\+|−|-|\/|\^|×)/.test(s) ||
+    /^(?:[−-]?\d+(?:\.\d+)?(?:[A-Za-z]+)?|[A-Za-z])\s*[+−-]\s*(?:\d*[A-Za-z]|\d+)/.test(s) ||
+    /\b(?:log|ln|sin|cos|tan|sec|csc|cot)[₀₁₂₃₄₅₆₇₈₉ₐ]?\s*(?:\(|θ|[A-Za-z]\b)/.test(s) ||
+    /\b(?:AX|AB|BA)\b\s*(?:=|≠)|\b[A-Z]\s*[+−-]\s*[A-Z]\b/.test(s) ||
+    /\b\d+(?:\s*[+−-]\s*\d+)+\s*=\s*\d+\b|\b\d+\s*=\s*\d+\^[A-Za-z0-9]+\b/.test(s) ||
+    /\b(?:degree|darjah)(?:\s+of\s+(?:the\s+)?(?:numerator|denominator)|\s+(?:numerator|denominator|pengangka|penyebut))?\s*(?:=|<|>|≤|≥)/i.test(s) ||
+    /\b[fghPQR](?:⁻¹)?\([^)]*\)/.test(s) ||
+    /\b[A-Za-z0-9]+\^[A-Za-z0-9]+\s*(?:=|≤|≥|<|>|≠)/.test(s) ||
+    /\b\d+\s*(?:=|≤|≥|<|>|≠)\s*\d+\b/.test(s) ||
+    /\b\d+\s*\/\s*\d+\b/.test(s) ||
+    /\(\d+\)\s*(?:=|≤|≥|<|>|≠)\s*(?:[^,.;:!?]{0,50})?\(\d+\)/.test(s) ||
+    /\|[^|]*[A-Za-z0-9][^|]*\|/.test(s) ||
+    /^[−-]?\d+\s*\/\s*\d+$/.test(s) ||
+    /^\[\s*[−-]?(?:\d+(?:\/\d+)?|[A-Za-z])\s*\]$/.test(s) ||
+    /\[[^\]]*(?:;|\|)[^\]]*\]/.test(s);
+}
+
+function isLikelyPureMath(text){
+  const s = String(text || "").trim().replace(/[.!?]$/, "");
+  if(!s || !hasMathCue(s)) return false;
+  if(/^[A-Za-z]{4,}\s/.test(s) && !/^(?:log|ln|sin|cos|tan|sec|csc|cot)\b/i.test(s)) return false;
+  const startsLikeMath = /^(?:[−-]?\d|√|\||\[|\(|[A-Za-z]\b|[A-Za-z][₀₁₂₃₄₅₆₇₈₉]|[A-Za-z]{2,3}\s*(?:[+−-]|=|≠|<|>|≤|≥|×)|[fghPQR](?:⁻¹)?\(|(?:log|ln|sin|cos|tan|sec|csc|cot)[₀₁₂₃₄₅₆₇₈₉ₐ]?(?:\(|\s*θ|\s+[A-Za-z]\b)|[A-Za-z]{1,3}[²³⁴⁵⁶⁷⁸⁹ⁿ^])/.test(s);
+  if(!startsLikeMath) return false;
+  const words = s.match(/[A-Za-z]{4,}/g) || [];
+  const allowed = {"sqrt":1,"left":1,"right":1,"frac":1,"begin":1,"end":1,"matrix":1};
+  return words.every(function(w){ return !!allowed[w.toLowerCase()]; });
+}
+
+function wrapMathForDisplay(expr, display){
+  const latex = plainMathToLatex(expr);
+  return display ? (MATHJAX_DISPLAY_OPEN + latex + MATHJAX_DISPLAY_CLOSE) : (MATHJAX_INLINE_OPEN + latex + MATHJAX_INLINE_CLOSE);
+}
+
+function trimMathCandidate(candidate){
+  const stop = /\s+\(?(gives|which|where|shifts|means|because|since|therefore|hence|using|with|when|must|cannot|represents|starts|moves|becomes|simplifies|factorises|factorizes|has|have|is|are|only|give|given|state|find)\b/i.exec(candidate);
+  const coord = /-(coordinate|axis)\b/i.exec(candidate);
+  let cut = -1;
+  if(stop) cut = stop.index;
+  if(coord && (cut < 0 || coord.index < cut)) cut = coord.index;
+  return cut >= 0 ? {math:candidate.slice(0,cut).trim(), rest:candidate.slice(cut)} : {math:candidate.trim(), rest:""};
+}
+
+function formatMathText(raw, preferDisplay){
+  const source = String(raw === null || raw === undefined ? "" : raw);
+  if(!source || source.indexOf(MATHJAX_INLINE_OPEN) !== -1 || source.indexOf(MATHJAX_DISPLAY_OPEN) !== -1) return source;
+  if(!hasMathCue(source) && !(preferDisplay && /(?:=|≤|≥|<|>|≠)/.test(source))) return source;
+  if(isLikelyPureMath(source)) return wrapMathForDisplay(source, !!preferDisplay);
+
+  let text = source;
+  const protectedMath = [];
+  function protect(expr, display){
+    const key = "\uE000" + protectedMath.length + "\uE001";
+    protectedMath.push(wrapMathForDisplay(expr, !!display));
+    return key;
+  }
+
+  // Interval/set notation first, so mixed bracket types such as [2, ∞) are not mistaken for matrices.
+  text = text.replace(/[\(\[]\s*[−-]?(?:∞|\d+(?:\/\d+)?)\s*,\s*[−-]?(?:∞|\d+(?:\/\d+)?)\s*[\)\]](?:\s*∪\s*[\(\[]\s*[−-]?(?:∞|\d+(?:\/\d+)?)\s*,\s*[−-]?(?:∞|\d+(?:\/\d+)?)\s*[\)\]])?/g, function(m){ return protect(m, false); });
+  // Matrices / augmented matrices.
+  text = text.replace(/\[[^\]\n]{1,100}\]/g, function(m){
+    if(isMatrixBody(m.slice(1,-1))) return protect(m, false);
+    return m;
+  });
+
+  // Absolute-value expressions.
+  text = text.replace(/\|[^|\n]{1,80}\|/g, function(m){ return hasMathCue(m) || /[A-Za-z0-9]/.test(m) ? protect(m, false) : m; });
+
+  // Common symbolic fragments embedded in prose.
+  text = text.replace(/\b(?:[fghPQR])(?:⁻¹)?\([^()]{1,60}\)/g, function(m){ return protect(m, false); });
+  text = text.replace(/[−-]\((?:\d*)[A-Za-z]\s*[+−-]\s*(?:\d+|[A-Za-z])\)/g, function(m){ return protect(m, false); });
+  text = text.replace(/\b[A-Z]{1,2}\s*[+−-]\s*[A-Z]{1,2}\b/g, function(m){ return protect(m, false); });
+  text = text.replace(/\b\d*[A-Za-z]\s*[+−-]\s*\d+\b/g, function(m){ return protect(m, false); });
+  text = text.replace(/\b(?:AX|AB|BA)\s*(?:=|≠)\s*[A-Z]{1,2}\b/g, function(m){ return protect(m, false); });
+  text = text.replace(/\b(?:degree|darjah)(?:\s+of\s+(?:the\s+)?(?:numerator|denominator)|\s+(?:numerator|denominator|pengangka|penyebut))?\s*(?:=|<|>|≤|≥)\s*\d+/gi, function(m){
+    const rel = m.match(/(?:=|<|>|≤|≥)\s*\d+/);
+    if(!rel) return m;
+    return m.slice(0, rel.index) + protect(rel[0], false);
+  });
+  text = text.replace(/\([A-Za-z]\s*[+−-]\s*(?:\d+|[A-Za-z])\)/g, function(m){ return protect(m, false); });
+  text = text.replace(/\b[A-Za-z][₀₁₂₃₄₅₆₇₈₉]+\s*×\s*[A-Za-z][₀₁₂₃₄₅₆₇₈₉]+/g, function(m){ return protect(m, false); });
+  text = text.replace(/\b(?:[A-Za-z]\s*[+−-]\s*[A-Za-z]{1,2}i|[A-Za-z]{2}\s*[+−-]\s*[A-Za-z]{2})\b/g, function(m){ return protect(m, false); });
+  text = text.replace(/\b[A-Za-z]{2}\s*(?:=|≠)\s*[A-Za-z]{1,2}\b/g, function(m){ return protect(m, false); });
+  text = text.replace(/\b[A-Za-z]{2}\s*[+−-]\s*[A-Za-z]{2}\s*(?:=|≠|≤|≥|<|>)\s*[−-]?\d+\b/g, function(m){ return protect(m, false); });
+  text = text.replace(/\b\d+\s*×\s*\d+\b/g, function(m){ return protect(m, false); });
+  text = text.replace(/\b\d+(?:\.\d+)?°(?:\s*[+−-]\s*\d+(?:\.\d+)?°)*(?:\s*=\s*\d+(?:\.\d+)?°)?/g, function(m){ return protect(m, false); });
+  text = text.replace(/(?:±\s*∞|(?:≤|≥|<|>|≠)\s*[−-]?\d+(?:\.\d+)?)/g, function(m){ return protect(m, false); });
+  text = text.replace(/\b[−-]?\d+(?:\.\d+)?\s*(?:[+−-]\s*[−-]?\d+(?:\.\d+)?\s*)+(?:=|≤|≥|<|>|≠)\s*[−-]?\d+(?:\.\d+)?\b/g, function(m){ return protect(m, false); });
+  text = text.replace(/\b\d+\s*(?:=|≤|≥|<|>|≠)\s*\d+\b/g, function(m){ return protect(m, false); });
+  text = text.replace(/\(\d+\)\s*(?:=|≤|≥|<|>|≠)\s*(?:degree\s+(?:of\s+)?(?:numerator|denominator)\s*)?\(\d+\)/gi, function(m){ return protect(m, false); });
+  text = text.replace(/\b[A-Za-z0-9]+\^[A-Za-z0-9]+\s*(?:=|≤|≥|<|>|≠)\s*[−-]?(?:\d+(?:\.\d+)?|[A-Za-z0-9]+)\b/g, function(m){ return protect(m, false); });
+  text = text.replace(/\b[−-]?\d+(?:\.\d+)?\s*=\s*[A-Za-z0-9]+\^[A-Za-z0-9]+\b/g, function(m){ return protect(m, false); });
+
+  // Equation / inequality clauses. Starts deliberately require a mathematical token,
+  // so ordinary prose is not swallowed into MathJax.
+  const equationPattern = /(?:[A-Za-z0-9]+(?:\^\([^)]*\)|\^[A-Za-z0-9]+)|[fghPQR](?:⁻¹)?\([^),;:!?]*\)|[A-Za-z][₀₁₂₃₄₅₆₇₈₉]+|(?:log|ln|sin|cos|tan|sec|csc|cot)[₀₁₂₃₄₅₆₇₈₉ₐ]?(?:\([^),;:!?]*\)|\s*θ|\s+[A-Za-z]\b)|[A-Za-z]{1,3}(?=[²³⁴⁵⁶⁷⁸⁹ⁿ^])|[A-Za-z]{2,3}(?=\s*(?:[+−-]|=|≠|<|>|≤|≥|×))|\b[A-Za-z]\b|[−-]?\d+(?:\.\d+)?[A-Za-z]+|\([^),;:!?]{1,80}\)|√(?:\([^)]*\)|[^\s,.;:!?]+))[^,.;:!?]{0,120}?(?:=|≤|≥|<|>|≠|→|⇒|⇔)[^,.;:!?]{0,120}/g;
+  text = text.replace(equationPattern, function(m){
+    if(m.indexOf("\uE000") !== -1) return m;
+    const t = trimMathCandidate(m);
+    if(!t.math || !hasMathCue(t.math)) return m;
+    return protect(t.math, false) + t.rest;
+  });
+
+  // Stand-alone mathematical constructs that may occur inside prose.
+  const atomPattern = /(?:[fghPQR](?:⁻¹)?\([^)]*\)|(?:log|ln|sin|cos|tan|sec|csc|cot)[₀₁₂₃₄₅₆₇₈₉ₐ]?(?:\([^)]*\)|\s*θ|\s+[A-Za-z]\b)|√(?:\([^)]*\)|[−-]?(?:\d+(?:\.\d+)?|[A-Za-z]))|[A-Za-z0-9\)](?:⁻¹|[²³⁴⁵⁶⁷⁸⁹ⁿ])|[A-Za-z][₀₁₂₃₄₅₆₇₈₉]+|[A-Za-z0-9]+(?:\^\([^)]*\)|\^[A-Za-z0-9]+)|[−-]?\d+\/\d+|π\/\d+|π|θ|±\s*∞|[−-]\d+)/g;
+  text = text.replace(atomPattern, function(m){
+    if(m.indexOf("\uE000") !== -1) return m;
+    return protect(m, false);
+  });
+
+  // Simple complex/algebraic forms such as a + bi or 5 + i.
+  text = text.replace(/\b(?:[A-Za-z]|\d+)\s*[+−-]\s*(?:\d*)i\b/g, function(m){ return protect(m, false); });
+
+  // Last-resort relation-symbol pass for mixed prose/mathematics. This keeps the prose outside MathJax.
+  text = text.replace(/[≤≥≠]/g, function(m){ return protect(m, false); });
+  if(preferDisplay) text = text.replace(/=/g, function(m){ return protect(m, false); });
+
+  protectedMath.forEach(function(value, idx){
+    text = text.split("\uE000" + idx + "\uE001").join(value);
+  });
+  return text;
+}
+
+function appendDisplayText(parent, raw){
+  const preferDisplay = !!(parent.classList && parent.classList.contains("formula"));
+  parent.appendChild(document.createTextNode(formatMathText(raw, preferDisplay)));
+}
+
+function mathHTML(raw, preferDisplay){
+  return escapeHTML(formatMathText(raw, !!preferDisplay));
+}
+
 /* ---------- Utility ---------- */
 function el(tag, attrs, children){
   const e = document.createElement(tag);
@@ -1942,11 +2261,18 @@ function el(tag, attrs, children){
     else if(k.indexOf("on") === 0 && typeof attrs[k] === "function") e.addEventListener(k.slice(2), attrs[k]);
     else e.setAttribute(k, attrs[k]);
   });
+  let firstRawString = null;
   (children || []).forEach(function(c){
     if(c === null || c === undefined) return;
-    if(typeof c === "string") e.appendChild(document.createTextNode(c));
-    else e.appendChild(c);
+    if(typeof c === "string"){
+      if(firstRawString === null) firstRawString = c;
+      appendDisplayText(e, c);
+    } else e.appendChild(c);
   });
+  // Preserve the exact internal answer string independently of MathJax-rendered text.
+  if(e.classList.contains("quiz-option") && firstRawString !== null){
+    e.dataset.rawValue = firstRawString;
+  }
   return e;
 }
 function qs(sel, root){ return (root||document).querySelector(sel); }
@@ -2549,7 +2875,7 @@ function toggleMalay(box, text){
   if(box.classList.contains("hidden")){
     box.innerHTML = "";
     box.appendChild(el("strong",{},["Simple Malay Explanation: "]));
-    box.appendChild(document.createTextNode(text));
+    appendDisplayText(box, text);
     box.classList.remove("hidden");
   } else {
     box.classList.add("hidden");
@@ -2618,8 +2944,8 @@ function renderIndependentPractice(topic, tp){
         if(!selected){ feedback.innerHTML=""; feedback.appendChild(el("div",{class:"feedback-box incorrect"},["Please select an answer before submitting."])); return; }
         const correct = selected === q.correctAnswer;
         qsa(".quiz-option", optWrap).forEach(function(o){
-          if(o.textContent === q.correctAnswer) o.classList.add("correct");
-          else if(o.textContent === selected && !correct) o.classList.add("incorrect");
+          if(o.dataset.rawValue === q.correctAnswer) o.classList.add("correct");
+          else if(o.dataset.rawValue === selected && !correct) o.classList.add("incorrect");
         });
         feedback.innerHTML = "";
         feedback.appendChild(el("div",{class:"feedback-box " + (correct?"correct":"incorrect")},[
@@ -2676,8 +3002,8 @@ function renderTopicCommonMistakes(topic){
       if(!sel){ fb.innerHTML=""; fb.appendChild(el("div",{class:"feedback-box incorrect"},["Please choose an answer first."])); return; }
       const correct = sel === err.practice.correctAnswer;
       qsa(".quiz-option", optWrap).forEach(function(o){
-        if(o.textContent === err.practice.correctAnswer) o.classList.add("correct");
-        else if(o.textContent === sel && !correct) o.classList.add("incorrect");
+        if(o.dataset.rawValue === err.practice.correctAnswer) o.classList.add("correct");
+        else if(o.dataset.rawValue === sel && !correct) o.classList.add("incorrect");
       });
       fb.innerHTML = "";
       fb.appendChild(el("div",{class:"feedback-box "+(correct?"correct":"incorrect")},[(correct?"Correct. ":"Not quite. ") + err.practice.explanation]));
@@ -2751,8 +3077,8 @@ function renderMasteryQuestion(){
     const correct = selected === q.correctAnswer;
     if(correct) sess.correct++;
     qsa(".quiz-option", optWrap).forEach(function(o){
-      if(o.textContent === q.correctAnswer) o.classList.add("correct");
-      else if(o.textContent === selected && !correct) o.classList.add("incorrect");
+      if(o.dataset.rawValue === q.correctAnswer) o.classList.add("correct");
+      else if(o.dataset.rawValue === selected && !correct) o.classList.add("incorrect");
     });
     feedback.innerHTML = "";
     feedback.appendChild(el("div",{class:"feedback-box "+(correct?"correct":"incorrect")},[(correct?"Correct. ":"Check this again. ") + q.explanation]));
@@ -3107,8 +3433,8 @@ function renderErrorClinic(){
         if(!pSel){ pFeedback.innerHTML=""; pFeedback.appendChild(el("div",{class:"feedback-box incorrect"},["Choose an answer."])); return; }
         const pCorrect = pSel === err.practice.correctAnswer;
         qsa(".quiz-option", pOptWrap).forEach(function(o){
-          if(o.textContent === err.practice.correctAnswer) o.classList.add("correct");
-          else if(o.textContent === pSel && !pCorrect) o.classList.add("incorrect");
+          if(o.dataset.rawValue === err.practice.correctAnswer) o.classList.add("correct");
+          else if(o.dataset.rawValue === pSel && !pCorrect) o.classList.add("incorrect");
         });
         pFeedback.innerHTML = "";
         pFeedback.appendChild(el("div",{class:"feedback-box "+(pCorrect?"correct":"incorrect")},[(pCorrect?"Correct. ":"Review the corrected method above. ") + err.practice.explanation]));
@@ -3226,8 +3552,8 @@ function submitPracticeAnswer(selected, optWrap, feedback){
   if(correct) sess.correct++;
   else sess.incorrectQuestions.push(q);
   qsa(".quiz-option", optWrap).forEach(function(o){
-    if(o.textContent === q.correctAnswer) o.classList.add("correct");
-    else if(o.textContent === selected && !correct) o.classList.add("incorrect");
+    if(o.dataset.rawValue === q.correctAnswer) o.classList.add("correct");
+    else if(o.dataset.rawValue === selected && !correct) o.classList.add("incorrect");
   });
   feedback.innerHTML = "";
   feedback.appendChild(el("div",{class:"feedback-box "+(correct?"correct":"incorrect")},[(correct?"Correct. ":"Check the skill: " + q.skill.replace(/-/g," ") + ". ") + q.explanation]));
@@ -3375,8 +3701,8 @@ function renderAssessmentQuestion(){
     if(!sess.assessmentMode){
       const correct = selected === q.correctAnswer;
       qsa(".quiz-option", optWrap).forEach(function(o){
-        if(o.textContent === q.correctAnswer) o.classList.add("correct");
-        else if(o.textContent === selected && !correct) o.classList.add("incorrect");
+        if(o.dataset.rawValue === q.correctAnswer) o.classList.add("correct");
+        else if(o.dataset.rawValue === selected && !correct) o.classList.add("incorrect");
       });
       feedback.innerHTML="";
       feedback.appendChild(el("div",{class:"feedback-box "+(correct?"correct":"incorrect")},[(correct?"Correct. ":"Not quite. ") + q.explanation]));
@@ -4007,7 +4333,7 @@ function exportDataToCSV(){
   URL.revokeObjectURL(url);
 }
 function printProgressReport(){
-  window.print();
+  typesetMath(qs("#app")).then(function(){ window.print(); });
 }
 
 /* ============================================================
@@ -4373,7 +4699,7 @@ function renderAGQuestionBlock(record, qIndex, container){
         cb.checked = !!(resp.selfChecks && resp.selfChecks[si]);
         cb.addEventListener("change", function(){ resp.selfChecks = resp.selfChecks || {}; resp.selfChecks[si] = cb.checked; agAutosave(record); });
         rowWrap.appendChild(cb);
-        rowWrap.appendChild(document.createTextNode(" " + stepText));
+        appendDisplayText(rowWrap, " " + stepText);
         partBox.appendChild(rowWrap);
       });
     } else {
@@ -4589,11 +4915,12 @@ function agGenerateFollowUp(record){
 /* ============================================================
    PRINTING (Question Paper / Answer Booklet / Marking Scheme)
    ============================================================ */
-function agEnterPrintMode(html){
+async function agEnterPrintMode(html){
   let area = document.getElementById("agPrintArea");
   if(!area){ area = document.createElement("div"); area.id = "agPrintArea"; document.body.appendChild(area); }
   area.innerHTML = "<div class='no-print' style='text-align:right;'><button type='button' onclick='agExitPrintMode()' style='margin:8px;padding:8px 14px;'>\u2715 Exit Print View</button></div>" + html;
   document.body.classList.add("ag-printing");
+  await typesetMath(area);
   clearTimeout(window.__agPrintFallbackTimer);
   window.__agPrintFallbackTimer = setTimeout(agExitPrintMode, 60000);
 }
@@ -4618,10 +4945,10 @@ function buildQuestionPaperHTML(record){
   record.questions.forEach(function(q, qi){
     html += "<div class='ag-print-question'>";
     html += "<p><strong>Question " + (qi+1) + "</strong> &mdash; " + escapeHTML(q.subtopic) + " (" + q.totalMarks + " marks)</p>";
-    html += "<p>" + escapeHTML(q.commandWord) + ": " + escapeHTML(q.stem).replace(/\n/g,"<br>") + "</p>";
+    html += "<p>" + escapeHTML(q.commandWord) + ": " + mathHTML(q.stem).replace(/\n/g,"<br>") + "</p>";
     if(q.graphSvg){ html += "<div style='text-align:center;margin:10px 0;'>" + q.graphSvg + "</div>"; }
     q.parts.forEach(function(part){
-      html += "<p style='margin-left:20px;'>(" + part.label + ") " + escapeHTML(part.text) + " <em>[" + part.marks + " mark(s)]</em></p>";
+      html += "<p style='margin-left:20px;'>(" + part.label + ") " + mathHTML(part.text) + " <em>[" + part.marks + " mark(s)]</em></p>";
       html += "<div class='ag-blank-space' style='height:" + agPrintWorkingHeight(part.marks) + "px;'></div>";
     });
     html += "</div>";
@@ -4659,18 +4986,18 @@ function buildMarkingSchemeHTML(record){
     q.parts.forEach(function(part){
       html += "<p style='margin-left:20px;'><strong>(" + part.label + ") [" + part.marks + " mark(s)]</strong></p>";
       html += "<ul>";
-      part.marking.forEach(function(m){ html += "<li>" + escapeHTML(m) + "</li>"; });
+      part.marking.forEach(function(m){ html += "<li>" + mathHTML(m) + "</li>"; });
       html += "</ul>";
-      html += "<p style='margin-left:20px;'>Worked solution: " + escapeHTML(part.solution) + "</p>";
+      html += "<p style='margin-left:20px;'>Worked solution: " + mathHTML(part.solution) + "</p>";
     });
     html += "</div>";
   });
   html += "<p style='text-align:center;font-weight:700;margin-top:20px;'>Total: " + record.totalMarks + " marks</p>";
   return html;
 }
-function printAGQuestionPaper(record){ agEnterPrintMode(buildQuestionPaperHTML(record)); window.print(); }
-function printAGAnswerBooklet(record){ agEnterPrintMode(buildAnswerBookletHTML(record)); window.print(); }
-function printAGMarkingScheme(record){ agEnterPrintMode(buildMarkingSchemeHTML(record)); window.print(); }
+async function printAGQuestionPaper(record){ await agEnterPrintMode(buildQuestionPaperHTML(record)); window.print(); }
+async function printAGAnswerBooklet(record){ await agEnterPrintMode(buildAnswerBookletHTML(record)); window.print(); }
+async function printAGMarkingScheme(record){ await agEnterPrintMode(buildMarkingSchemeHTML(record)); window.print(); }
 
 /* ============================================================
    CSV EXPORT
@@ -4869,6 +5196,7 @@ function refreshPresentation(){
       const context=qs('p',parent);input.setAttribute('aria-label',context?context.textContent:'Your answer');
     }
   });
+  if(containsMathDelimiter(app)) scheduleMathTypeset(app);
 }
 function initializeShell(){
   applyTheme(readUIPreference('psim_ui_theme_v1','light'));
@@ -4901,7 +5229,12 @@ function initializeShell(){
       if(!box.contains(document.activeElement)){const input=qs('input,button,select,textarea',box);(input||box).focus();}
     }else if(!box&&modalActive){modalActive=false;if(modalReturnFocus&&modalReturnFocus.isConnected)modalReturnFocus.focus();}
   });
-  modalObserver.observe(qs('#modalRoot'),{childList:true});
+  modalObserver.observe(qs('#modalRoot'),{childList:true,subtree:true});
+  const mathModalObserver = new MutationObserver(function(){
+    const root = qs('#modalRoot');
+    if(containsMathDelimiter(root)) scheduleMathTypeset(root);
+  });
+  mathModalObserver.observe(qs('#modalRoot'),{childList:true,subtree:true});
   document.addEventListener('keydown',function(event){
     const box=qs('#modalRoot .modal-box');
     if(box){if(event.key==='Escape'){event.preventDefault();closeModal();}else trapUIFocus(event,box);return;}
