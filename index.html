@@ -67,6 +67,16 @@ a.visually-hidden:focus {position:fixed; top:8px; left:8px; width:auto; height:a
 .header-top {min-height:94px; padding:12px 28px; display:flex; align-items:center; justify-content:space-between; gap:20px;}
 .brand {display:flex; align-items:center; gap:12px; min-width:0;}
 .brand-mark {display:grid; place-items:center; width:44px; height:44px; flex-shrink:0; border-radius:13px; background:var(--purple-tint); color:var(--turquoise-dark); font:700 24px var(--font-display);}
+.brand-logo{
+  width:44px;
+  height:44px;
+  object-fit:cover;
+  border-radius:50%;
+  flex-shrink:0;
+  display:block;
+  box-shadow:0 2px 10px rgba(0,0,0,.12);
+}
+
 .brand-text {min-width:0;}
 .brand-text h1 {font-size:18px; margin:0 0 2px; color:var(--turquoise-dark);}
 .brand-text .brand-subtitle {font-size:13px; color:var(--charcoal); margin:0;}
@@ -180,6 +190,7 @@ table.data-table {width:100%; border-collapse:collapse; font-size:14px; min-widt
 #companionLog:empty::before {content:'Choose a prompt below to begin your learning conversation.'; color:var(--muted); text-align:center; padding:24px 0;}
 .companion-msg {max-width:88%; align-self:flex-start; background:var(--white); border:1px solid var(--line); border-radius:16px 16px 16px 4px; padding:16px; font-size:15px;}
 .companion-msg.you {align-self:flex-end; background:var(--purple-tint); border-color:var(--purple-tint-2); border-radius:16px 16px 4px 16px;}
+.companion-msg.system {align-self:center; max-width:100%; padding:8px 12px; background:transparent; border:0; color:var(--muted); font-size:12px; text-align:center;}
 .error-list {list-style:none; padding:0;}
 .error-list li {display:flex; justify-content:space-between; gap:16px; border-bottom:1px solid var(--line); padding:12px 0; font-size:14px;}
 .geo-accent {height:3px; width:56px; background:var(--grad-brand); border-radius:3px; margin:8px 0 16px;}
@@ -250,7 +261,7 @@ body.modal-open,body.drawer-open {overflow:hidden;}
   .header-top {min-height:76px; padding:12px 16px; gap:12px;}
   .brand-text .brand-subtitle {display:none;}
   .brand-text p {max-width:280px; font-size:10px;}
-  .brand-mark {display:none;}
+  .brand-mark {display:none;} .brand-logo{width:38px;height:38px;}
   .student-chip {max-width:140px;}
   main#app {padding:24px 20px 32px;}
   .quick-actions {grid-template-columns:repeat(3,minmax(0,1fr));}
@@ -260,7 +271,7 @@ body.modal-open,body.drawer-open {overflow:hidden;}
 }
 @media(max-width:600px) {
   .header-top {min-height:68px; padding:10px 12px; gap:8px;}
-  .brand {gap:8px;} .brand-text h1 {font-size:14px; margin:0; white-space:nowrap;}
+  .brand {gap:8px;} .brand-logo{width:34px;height:34px;} .brand-text h1 {font-size:14px; margin:0; white-space:nowrap;}
   .brand-text p {display:none;}
   .header-right {gap:6px;}
   .student-chip {width:44px; min-width:44px; padding:8px 0; font-size:0;}
@@ -315,18 +326,73 @@ mjx-container[jax="CHTML"][display="true"] {
 #agPrintArea {display:none;}
 body.ag-printing {overflow:auto; background:#fff;}
 body.ag-printing>*:not(#agPrintArea) {display:none!important;}
-body.ag-printing #agPrintArea {display:block!important; max-width:800px; margin:auto; padding:24px; font-family:'Segoe UI',sans-serif; color:#000; background:#fff;}
+body.ag-printing #agPrintArea {display:block!important; max-width:800px; margin:auto; padding:24px; font-family:'Segoe UI',sans-serif; color:#000!important; background:#fff!important;}
+
+/* Keep printed/print-preview mathematics dark and readable even when the website is in Dark Mode.
+   The normal dark-theme MathJax rule explicitly sets a light colour, so print view must override it. */
+body.ag-printing #agPrintArea,
+body.ag-printing #agPrintArea p,
+body.ag-printing #agPrintArea li,
+body.ag-printing #agPrintArea h1,
+body.ag-printing #agPrintArea h2,
+body.ag-printing #agPrintArea h3,
+body.ag-printing #agPrintArea h4,
+body.ag-printing #agPrintArea strong,
+body.ag-printing #agPrintArea em,
+body.ag-printing #agPrintArea span,
+body.ag-printing #agPrintArea .math-content,
+body.ag-printing #agPrintArea mjx-container,
+body.ag-printing #agPrintArea mjx-container * {
+  color:#000!important;
+  -webkit-text-fill-color:#000!important;
+  text-shadow:none!important;
+}
+
+body.ag-printing #agPrintArea mjx-container {
+  opacity:1!important;
+  filter:none!important;
+}
+
 #agPrintArea .ag-print-question {margin-bottom:16px; page-break-inside:avoid;}
 #agPrintArea .ag-blank-space {margin-left:20px;}
+#agPrintArea .student-report {font-family:'Inter','Segoe UI',Arial,sans-serif; color:#111; line-height:1.45;}
+#agPrintArea .student-report-header {display:flex; align-items:center; gap:14px; border-bottom:2px solid #4C1D95; padding-bottom:14px; margin-bottom:18px;}
+#agPrintArea .student-report-logo {width:58px; height:58px; border-radius:50%; object-fit:cover;}
+#agPrintArea .student-report h1 {font-size:22px; margin:0 0 3px; color:#2B1742;}
+#agPrintArea .student-report h2 {font-size:17px; margin:24px 0 10px; color:#4C1D95;}
+#agPrintArea .student-report p {margin:5px 0 9px;}
+#agPrintArea .student-report-summary {display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:14px 0 18px;}
+#agPrintArea .student-report-summary>div {border:1px solid #ddd; border-radius:8px; padding:10px;}
+#agPrintArea .student-report-summary strong {display:block; font-size:17px; color:#4C1D95;}
+#agPrintArea .student-report table {width:100%; border-collapse:collapse; margin:8px 0 14px; font-size:12px;}
+#agPrintArea .student-report th,#agPrintArea .student-report td {border:1px solid #d8d8d8; padding:7px 8px; text-align:left; vertical-align:top;}
+#agPrintArea .student-report th {background:#f2edf9; color:#2B1742;}
+#agPrintArea .student-report ul {margin:6px 0 14px; padding-left:20px;}
+#agPrintArea .student-report-footer {margin-top:24px; padding-top:10px; border-top:1px solid #ccc; font-size:10px; color:#555;}
+@media print {
+  #agPrintArea .student-report-summary {grid-template-columns:repeat(3,1fr)!important;}
+  #agPrintArea .student-report {color:#000!important; background:#fff!important;}
+  #agPrintArea .student-report * {-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+}
+
 @media print {
   :root,:root[data-theme="dark"] {color-scheme:light; --white:#fff; --charcoal:#000; --muted:#444; --bg:#fff; --line:#ccc; --purple-tint:#f4f1f8; --turquoise-dark:#4c1d95;}
-  body {background:#fff; overflow:visible!important;}
+  body {background:#fff!important; color:#000!important; overflow:visible!important;}
   .site-header,.main-nav,.drawer-overlay,.btn,.site-footer,.no-print,.modal-overlay,.page-nav {display:none!important;}
   .workspace {margin:0!important;} main#app {padding:0;max-width:none;}
   .analytics-layout {display:block;} .card {box-shadow:none; break-inside:auto;}
   .table-scroll {overflow:visible;} table.data-table {min-width:0;font-size:10px;}
   .data-table th,.data-table td {padding:6px;}
-  body.ag-printing #agPrintArea {padding:0;}
+  body.ag-printing #agPrintArea {padding:0; color:#000!important; background:#fff!important;}
+  body.ag-printing #agPrintArea *,
+  body.ag-printing #agPrintArea mjx-container,
+  body.ag-printing #agPrintArea mjx-container * {
+    color:#000!important;
+    -webkit-text-fill-color:#000!important;
+    text-shadow:none!important;
+    opacity:1!important;
+    filter:none!important;
+  }
 }
 </style>
 </head>
@@ -336,7 +402,7 @@ body.ag-printing #agPrintArea {display:block!important; max-width:800px; margin:
   <div class="header-top">
     <div class="brand">
       <button class="menu-toggle" id="menuToggleBtn" aria-expanded="false" aria-controls="mainSidebar" aria-label="Open navigation menu">☰</button>
-      <div class="brand-mark" aria-hidden="true">∑</div>
+      <img src="data:image/webp;base64,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" alt="P-SIM Mathematics 1 logo" class="brand-logo">
       <div class="brand-text">
         <h1>P-SIM MTCF 0114</h1>
         <p class="brand-subtitle">Personalized Self-Instructional Material for Mathematics 1</p>
@@ -3801,8 +3867,11 @@ function renderProgressDashboard(){
   infoGrid.appendChild(statTile("Overall Progress", overall+"%"));
   headerCard.appendChild(infoGrid);
   headerCard.appendChild(el("div",{class:"progressbar-track"},[el("div",{class:"progressbar-fill", style:"width:"+overall+"%"},[])]));
-  headerCard.appendChild(el("div",{class:"btn-row"},[el("button",{class:"btn gold", onclick:exportDataToCSV},["\u{1F4E5} Download My Learning Report"])]));
-  headerCard.appendChild(el("p",{class:"topnote"},["Your learning record is stored on this device. Download your report if you would like to keep a copy or share your progress with your lecturer."]));
+  headerCard.appendChild(el("div",{class:"btn-row"},[
+    el("button",{class:"btn gold", onclick:downloadStudentLearningReport, title:"Download a complete printable learning report"},["\u{1F4E5} Download My Learning Report"]),
+    el("button",{class:"btn outline", onclick:printStudentLearningReport, title:"Print the report or save it as PDF"},["\u{1F5A8}\uFE0F Print / Save as PDF"])
+  ]));
+  headerCard.appendChild(el("p",{class:"topnote"},["Your learning record is stored on this device. Download a complete report, or use Print / Save as PDF to print it or save a PDF copy for sharing with your lecturer."]));
   app.appendChild(headerCard);
 
   // Diagnostic results
@@ -4043,26 +4112,204 @@ function deleteSession(sessionId){
 /* ============================================================
    LEARNING COMPANION
    ============================================================ */
+
+/* One source of truth for the Learning Companion's active topic.
+   It is synchronised with #companionTopic on every change and again
+   immediately before each quick-action response is generated. */
+let selectedTopic = null;
+
+/* Session-only rotation state. This prevents repeated quick actions from
+   always returning exactly the same item while keeping localStorage intact. */
+const companionRotationState = {};
+const companionHintState = {};
+
+/* Topic-specific Learning Companion content.
+   Keys are the EXACT topic names already used in the dropdown. */
+const learningCompanionData = TOPICS.reduce(function(store, topic){
+  const conceptBlocks = (topic.conceptNote && topic.conceptNote.blocks) ? topic.conceptNote.blocks : [];
+  const examples = topic.examples || [];
+  const practice = topic.practice || [];
+  const commonErrors = topic.commonErrors || [];
+  const diagnostics = topic.diagnostic || [];
+
+  store[topic.name] = {
+    simpleExplanation: conceptBlocks.map(function(block){
+      return block.h + ": " + block.p + (block.formula ? " Key idea: " + block.formula + "." : "");
+    }),
+    hints: practice.map(function(q){
+      return {
+        question: q.question,
+        skill: q.skill,
+        levels: [
+          "Hint 1 of 3 — Identify the main concept first: " + q.skill.replace(/-/g," ") + ". Which rule, definition or formula from " + topic.name + " is relevant?",
+          "Hint 2 of 3 — For the question “" + q.question + "”, write down the information given and set up the first mathematical relationship. Do not calculate the final answer yet.",
+          "Hint 3 of 3 — " + companionNextStepGuidance(topic.id, q.skill) + " Stop once you have completed the next justified step, then check whether your working still satisfies any sign, domain or method restrictions."
+        ]
+      };
+    }),
+    examples: examples.map(function(ex){
+      return ex.level + " example — " + ex.title + ": " + ex.steps.join(" ");
+    }),
+    commonMistakes: commonErrors.map(function(err){
+      return err.title + ". Why it happens: " + err.why + " Correct approach: " + err.correctMethod;
+    }),
+    revisionAdvice: (topic.outcomes || []).map(function(outcome, index){
+      const block = conceptBlocks[index % Math.max(conceptBlocks.length,1)];
+      const focus = block ? block.h.replace(/^\d+\.\s*/,"") : topic.name;
+      return "Revision focus: " + focus + ". Target outcome: " + outcome;
+    }),
+    simpleMalay: [topic.malayNote].concat(
+      diagnostics.filter(function(q){ return q.malayExplanation; })
+        .slice(0,4)
+        .map(function(q){ return q.malayExplanation; })
+    ).filter(Boolean)
+  };
+  return store;
+}, {});
+
+function companionNextStepGuidance(topicId, skill){
+  const guidance = {
+    algebra: "Arrange the expression carefully, then perform one valid algebraic step at a time. If it is an inequality, pay special attention to sign reversal when multiplying or dividing by a negative number.",
+    functions: "Decide whether the task concerns substitution, domain/range, a graph transformation or an inverse. Apply the matching rule before simplifying.",
+    polynomial: "Identify the degree, relevant theorem or denominator factor type first. Then carry out the theorem, division or partial-fraction setup in the correct order.",
+    explog: "Decide whether the bases can be matched or whether logarithm laws are needed. For logarithms, keep every argument positive and check the domain.",
+    trig: "Identify the quadrant, reference angle, identity, amplitude or period that applies. Determine the sign before substituting exact values.",
+    systems: "Write the equations or matrix in standard form first. Then choose a legal elementary row operation that removes one variable or simplifies the next row."
+  };
+  return guidance[topicId] || ("Use the rule connected to " + String(skill || "this skill").replace(/-/g," ") + " and complete only the next mathematical step.");
+}
+
+function validCompanionTopicId(topicId){
+  return !!getTopic(topicId);
+}
+
+function getActiveCompanionTopicId(){
+  const dropdown = qs("#companionTopic");
+  if(dropdown && validCompanionTopicId(dropdown.value)){
+    selectedTopic = dropdown.value;
+  }
+  if(!validCompanionTopicId(selectedTopic)){
+    selectedTopic = TOPICS[0].id;
+  }
+  return selectedTopic;
+}
+
+function getCompanionData(topicId){
+  const topic = getTopic(topicId);
+  if(!topic) return null;
+  return learningCompanionData[topic.name] || null;
+}
+
+function nextCompanionItem(topicId, category, items){
+  if(!items || !items.length) return null;
+  const key = topicId + "::" + category;
+  const index = companionRotationState[key] || 0;
+  const item = items[index % items.length];
+  companionRotationState[key] = (index + 1) % items.length;
+  return item;
+}
+
+function nextCompanionHint(topicId, data){
+  const hints = data && data.hints ? data.hints : [];
+  if(!hints.length) return "Start by identifying the key concept and writing the relevant definition or formula before calculating.";
+
+  let state = companionHintState[topicId];
+  if(!state){
+    state = {questionIndex:0, level:0};
+    companionHintState[topicId] = state;
+  }
+
+  const scaffold = hints[state.questionIndex % hints.length];
+  const level = state.level;
+  const response = "Practice focus: “" + scaffold.question + "” " + scaffold.levels[level];
+
+  state.level++;
+  if(state.level >= scaffold.levels.length){
+    state.level = 0;
+    state.questionIndex = (state.questionIndex + 1) % hints.length;
+  }
+  return response;
+}
+
+function appendCompanionMessage(log, message, kind){
+  const cls = kind === "you" ? "companion-msg you" : (kind === "system" ? "companion-msg system" : "companion-msg");
+  const node = el("div",{class:cls},[message]);
+  log.appendChild(node);
+  return node;
+}
+
+function appendCompanionSystemMessage(log, topicId, persist){
+  const topic = getTopic(topicId);
+  if(!topic) return;
+  const message = "Now helping you with: " + topic.name;
+  appendCompanionMessage(log, message, "system");
+  if(persist){
+    appState.data.companionLog.push({
+      type:"system",
+      topicId:topicId,
+      response:message,
+      date:new Date().toISOString()
+    });
+    saveStudentData();
+  }
+}
+
+function renderCompanionHistory(log){
+  appState.data.companionLog.slice(-12).forEach(function(entry){
+    if(entry.type === "system"){
+      appendCompanionMessage(log, entry.response || ("Now helping you with: " + (getTopic(entry.topicId) ? getTopic(entry.topicId).name : "selected topic")), "system");
+      return;
+    }
+    if(entry.prompt) appendCompanionMessage(log, entry.prompt, "you");
+    if(entry.response) appendCompanionMessage(log, entry.response, "assistant");
+  });
+  scheduleMathTypeset(log);
+}
+
 function renderLearningCompanion(){
   const app = qs("#app");
   app.appendChild(pageNavRow());
   const card = el("div",{class:"card"});
   card.appendChild(el("h2",{},["MTCF 0114 Learning Companion"]));
-  card.appendChild(el("p",{class:"topnote"},["This is an interactive learning guide built from the MTCF 0114 course content. It is not connected to an external AI model \u2014 it selects relevant guidance based on your selected topic and recent progress."]));
+  card.appendChild(el("p",{class:"topnote"},["This is an interactive learning guide built from the MTCF 0114 course content. It is not connected to an external AI model — it selects relevant guidance based on your selected topic and recent progress."]));
 
   const topicSelectWrap = el("div",{class:"formfield"});
   topicSelectWrap.appendChild(el("label",{for:"companionTopic"},["Which topic would you like help with?"]));
   const sel = el("select",{id:"companionTopic"});
-  TOPICS.forEach(function(t){ sel.appendChild(el("option",{value:t.id, selected: t.id===appState.currentTopicId || t.id===appState.data.profile.topic ? "selected": null},[t.name])); });
+  TOPICS.forEach(function(t){
+    sel.appendChild(el("option",{value:t.id},[t.name]));
+  });
+
+  const profileTopic = appState.data.profile && validCompanionTopicId(appState.data.profile.topic) ? appState.data.profile.topic : null;
+  const initialTopic = validCompanionTopicId(selectedTopic) ? selectedTopic :
+    (validCompanionTopicId(appState.currentTopicId) ? appState.currentTopicId :
+      (profileTopic || TOPICS[0].id));
+
+  selectedTopic = initialTopic;
+  sel.value = selectedTopic;
+
   topicSelectWrap.appendChild(sel);
   card.appendChild(topicSelectWrap);
 
   const log = el("div",{id:"companionLog"});
-  appState.data.companionLog.slice(-8).forEach(function(entry){
-    log.appendChild(el("div",{class:"companion-msg you"},[entry.prompt]));
-    log.appendChild(el("div",{class:"companion-msg"},[entry.response]));
-  });
+  renderCompanionHistory(log);
   card.appendChild(log);
+
+  /* The dropdown controls every subsequent Learning Companion action. */
+  sel.addEventListener("change", function(){
+    selectedTopic = this.value;
+    if(!validCompanionTopicId(selectedTopic)) selectedTopic = TOPICS[0].id;
+
+    /* A topic switch starts a fresh hint scaffold for the newly selected topic.
+       Previous chat remains visible but is never used as response context. */
+    companionHintState[selectedTopic] = {questionIndex:0, level:0};
+
+    appendCompanionSystemMessage(log, selectedTopic, true);
+    const topic = getTopic(selectedTopic);
+    appendCompanionMessage(log, "Topic changed to " + topic.name + ". What would you like help with?", "assistant");
+    scheduleMathTypeset(log);
+    log.scrollTop = log.scrollHeight;
+  });
 
   const promptGrid = el("div",{class:"option-grid"});
   [
@@ -4070,53 +4317,89 @@ function renderLearningCompanion(){
     "Help me identify my mistake","What should I revise next?","Explain in simple Malay"
   ].forEach(function(prompt){
     promptGrid.appendChild(el("button",{type:"button", class:"option-card", onclick:function(){
-      const topicId = sel.value;
-      const response = companionRespond(prompt, topicId);
-      appState.data.companionLog.push({prompt: prompt + " (" + getTopic(topicId).name + ")", response: response, date:new Date().toISOString()});
+      /* Read the CURRENT dropdown value at click time; no fixed topic is captured. */
+      const topicId = getActiveCompanionTopicId();
+      const topic = getTopic(topicId);
+      const response = companionRespond(prompt);
+
+      appState.data.companionLog.push({
+        type:"exchange",
+        topicId:topicId,
+        prompt:prompt + " (" + topic.name + ")",
+        response:response,
+        date:new Date().toISOString()
+      });
       saveStudentData();
-      log.appendChild(el("div",{class:"companion-msg you"},[prompt + " (" + getTopic(topicId).name + ")"]));
-      log.appendChild(el("div",{class:"companion-msg"},[response]));
-      log.scrollIntoView({behavior:"smooth", block:"end"});
+
+      appendCompanionMessage(log, prompt + " (" + topic.name + ")", "you");
+      appendCompanionMessage(log, response, "assistant");
+      scheduleMathTypeset(log);
+      log.scrollTop = log.scrollHeight;
     }},[prompt]));
   });
   card.appendChild(promptGrid);
   app.appendChild(card);
+
+  if(containsMathDelimiter(card)) scheduleMathTypeset(card);
 }
 
-function companionRespond(prompt, topicId){
+function companionRespond(prompt){
+  const topicId = getActiveCompanionTopicId();
   const topic = getTopic(topicId);
+  const data = getCompanionData(topicId);
+
+  if(!topic || !data){
+    return "Please select a Mathematics 1 topic from the dropdown before continuing.";
+  }
+
   const diag = appState.data.diagnostic[topicId];
   const pathway = currentPathwayFor(topicId);
+
   if(prompt === "Explain this concept simply"){
-    const block = topic.conceptNote.blocks[0];
-    return "Here is a simple explanation for " + topic.name + ": " + block.p + " Key formula: " + block.formula;
+    const explanation = nextCompanionItem(topicId, "simpleExplanation", data.simpleExplanation);
+    return topic.name + " — " + (explanation || "Review the key concept notes for this topic, then try one worked example.");
   }
+
   if(prompt === "Give me a hint"){
-    const q = topic.practice[0];
-    return "Try this question as practice: \u201c" + q.question + "\u201d. Hint: think about the skill \u201c" + q.skill.replace(/-/g," ") + "\u201d before attempting it.";
+    return topic.name + " — " + nextCompanionHint(topicId, data);
   }
+
   if(prompt === "Show another example"){
-    const ex = topic.examples[Math.floor(Math.random()*topic.examples.length)];
-    return ex.level + " example \u2014 " + ex.title + ": " + ex.steps.join(" ");
+    const example = nextCompanionItem(topicId, "examples", data.examples);
+    return topic.name + " — " + (example || "Open this topic's worked examples and choose one problem to attempt step by step.");
   }
+
   if(prompt === "Help me identify my mistake"){
-    const errKeys = Object.keys(appState.data.errors);
-    if(errKeys.length === 0){ return "You don't have any recorded error patterns yet. Try some practice questions, and I will be able to point out patterns afterwards."; }
-    const topErr = errKeys.sort(function(a,b){return appState.data.errors[b]-appState.data.errors[a];})[0];
-    const matched = topic.commonErrors.find(function(e){ return e.id === topErr; });
-    if(matched) return "Your most frequent recorded pattern is related to \u201c" + matched.title + "\u201d. " + matched.why;
-    return "Your most frequent recorded pattern relates to the skill \u201c" + topErr.replace(/-/g," ") + "\u201d. Review the concept notes and common mistakes sections for " + topic.name + ".";
+    const topicDiagnosticErrors = diag && diag.errorCategories ? Object.keys(diag.errorCategories) : [];
+    topicDiagnosticErrors.sort(function(a,b){ return (diag.errorCategories[b] || 0) - (diag.errorCategories[a] || 0); });
+
+    const mistake = nextCompanionItem(topicId, "commonMistakes", data.commonMistakes);
+    if(topicDiagnosticErrors.length){
+      return topic.name + " — Your diagnostic for this topic recorded a pattern related to “" +
+        topicDiagnosticErrors[0].replace(/-/g," ") + "”. " +
+        (mistake || "Revisit the Common Error Clinic for this topic and compare your working step by step.");
+    }
+    return topic.name + " — " + (mistake ||
+      "No topic-specific error pattern has been recorded yet. Try a few practice questions first, then compare each incorrect step with the Common Error Clinic.");
   }
+
   if(prompt === "What should I revise next?"){
     if(diag && diag.skillsWeak && diag.skillsWeak.length){
-      return "Based on your diagnostic assessment, focus on: " + diag.skillsWeak.join(", ").replace(/-/g," ") + ". Your current pathway is " + pathway.level + ".";
+      return topic.name + " — Based on your diagnostic assessment, revise these skills first: " +
+        diag.skillsWeak.map(function(s){return s.replace(/-/g," ");}).join(", ") +
+        ". Your current pathway is " + pathway.level + ".";
     }
-    return "Complete a diagnostic assessment for " + topic.name + " so I can recommend specific skills to revise.";
+    const advice = nextCompanionItem(topicId, "revisionAdvice", data.revisionAdvice);
+    return topic.name + " — " + (advice ||
+      "Complete the diagnostic assessment for this topic so the Learning Companion can prioritise specific skills for revision.");
   }
+
   if(prompt === "Explain in simple Malay"){
-    return topic.malayNote;
+    const malay = nextCompanionItem(topicId, "simpleMalay", data.simpleMalay);
+    return topic.name + " — " + (malay || "Sila pilih satu konsep dalam topik ini dan semak nota konsep serta contoh langkah demi langkah.");
   }
-  return "I'm here to help with " + topic.name + ". Try one of the guided prompts above.";
+
+  return "I'm here to help with " + topic.name + ". Choose one of the guided prompts above.";
 }
 
 /* ============================================================
@@ -4299,6 +4582,166 @@ function openTeacherClearConfirm(){
   ]));
   overlay.appendChild(box);
   qs("#modalRoot").appendChild(overlay);
+}
+
+
+/* ---- Student Learning Report: downloadable + printable ---- */
+function reportSafe(value){
+  return escapeHTML(value === null || value === undefined || value === "" ? "\u2014" : String(value));
+}
+function reportFileSafeName(value){
+  return String(value || "student").trim().replace(/[^a-z0-9_-]+/gi,"_").replace(/^_+|_+$/g,"") || "student";
+}
+function buildStudentLearningReportHTML(){
+  const data = appState.data;
+  const p = data.profile || {};
+  const overall = calculateOverallProgress();
+  const stats = data.practiceStats || {totalAttempted:0,totalCorrect:0};
+  const accuracy = pct(stats.totalCorrect || 0, stats.totalAttempted || 0);
+  const logo = qs(".brand-logo");
+  const logoSrc = logo ? logo.src : "";
+  const generated = new Date().toLocaleString("en-GB");
+
+  let report = "<div class='student-report'>";
+  report += "<div class='student-report-header'>";
+  if(logoSrc) report += "<img class='student-report-logo' src='" + reportSafe(logoSrc) + "' alt='P-SIM logo'>";
+  report += "<div><h1>P-SIM MTCF 0114 Learning Report</h1>";
+  report += "<p>Personalized Self-Instructional Material for Mathematics 1</p>";
+  report += "<p>Centre for Foundation Studies \u00b7 International Islamic University Malaysia</p></div></div>";
+
+  report += "<p><strong>Student:</strong> " + reportSafe(p.name) +
+            " &nbsp;&nbsp; <strong>Section:</strong> " + reportSafe(p.section) +
+            " &nbsp;&nbsp; <strong>Generated:</strong> " + reportSafe(generated) + "</p>";
+
+  report += "<div class='student-report-summary'>";
+  report += "<div><strong>" + overall + "%</strong><span>Overall Progress</span></div>";
+  report += "<div><strong>" + (stats.totalAttempted || 0) + "</strong><span>Questions Attempted</span></div>";
+  report += "<div><strong>" + accuracy + "%</strong><span>Practice Accuracy</span></div>";
+  report += "</div>";
+
+  report += "<h2>Diagnostic Results</h2>";
+  const diagKeys = Object.keys(data.diagnostic || {});
+  if(!diagKeys.length){
+    report += "<p>No diagnostic assessments completed yet.</p>";
+  } else {
+    report += "<table><thead><tr><th>Topic</th><th>Score</th><th>Pathway</th><th>Date</th></tr></thead><tbody>";
+    diagKeys.forEach(function(k){
+      const d = data.diagnostic[k];
+      const topic = getTopic(k);
+      report += "<tr><td>" + reportSafe(topic ? topic.name : k) + "</td><td>" +
+                reportSafe(d.percent + "%") + "</td><td>" + reportSafe(d.pathway) +
+                "</td><td>" + reportSafe(formatDate(d.date)) + "</td></tr>";
+    });
+    report += "</tbody></table>";
+  }
+
+  report += "<h2>Topic Progress & Mastery</h2>";
+  report += "<table><thead><tr><th>Topic</th><th>Progress</th><th>Mastery Score</th></tr></thead><tbody>";
+  TOPICS.forEach(function(t){
+    const mastery = data.mastery[t.id];
+    report += "<tr><td>" + reportSafe(t.name) + "</td><td>" +
+              calculateTopicProgress(t.id) + "%</td><td>" +
+              (mastery ? reportSafe(mastery.percent + "%") : "\u2014") + "</td></tr>";
+  });
+  report += "</tbody></table>";
+
+  report += "<h2>Practice Summary</h2>";
+  report += "<table><tbody>";
+  report += "<tr><th>Total Questions Attempted</th><td>" + (stats.totalAttempted || 0) + "</td></tr>";
+  report += "<tr><th>Correct Answers</th><td>" + (stats.totalCorrect || 0) + "</td></tr>";
+  report += "<tr><th>Accuracy</th><td>" + accuracy + "%</td></tr>";
+  report += "</tbody></table>";
+
+  report += "<h2>Common Error Categories</h2>";
+  const errorKeys = Object.keys(data.errors || {}).sort(function(a,b){ return data.errors[b] - data.errors[a]; });
+  if(!errorKeys.length){
+    report += "<p>No recorded error patterns yet.</p>";
+  } else {
+    report += "<table><thead><tr><th>Error Category</th><th>Recorded Count</th></tr></thead><tbody>";
+    errorKeys.forEach(function(k){
+      report += "<tr><td>" + reportSafe(k.replace(/-/g," ")) + "</td><td>" + reportSafe(data.errors[k]) + "</td></tr>";
+    });
+    report += "</tbody></table>";
+  }
+
+  report += "<h2>Learning Streak & Badges</h2>";
+  report += "<p><strong>Recorded learning days:</strong> " + calculateStreak() + "</p>";
+  if(data.badges && data.badges.length){
+    report += "<ul>" + data.badges.map(function(b){ return "<li>" + reportSafe(b) + "</li>"; }).join("") + "</ul>";
+  } else {
+    report += "<p>No badges earned yet.</p>";
+  }
+
+  report += "<h2>Assessment Generator History</h2>";
+  const submitted = (data.assessmentRecords || []).filter(function(r){ return r.status === "submitted"; });
+  if(!submitted.length){
+    report += "<p>No completed generated assessments yet.</p>";
+  } else {
+    report += "<table><thead><tr><th>Paper</th><th>Date</th><th>Score</th></tr></thead><tbody>";
+    submitted.slice(0,12).forEach(function(r){
+      report += "<tr><td>" + reportSafe(r.meta && r.meta.title ? r.meta.title : "Assessment") +
+                "</td><td>" + reportSafe(formatDate(r.startTime || r.date)) +
+                "</td><td>" + reportSafe(r.score + " / " + r.totalMarks + " (" + pct(r.score,r.totalMarks) + "%)") +
+                "</td></tr>";
+    });
+    report += "</tbody></table>";
+  }
+
+  report += "<h2>Recent Activity</h2>";
+  const recent = (data.recentActivity || []).slice(0,15);
+  if(!recent.length){
+    report += "<p>No activity recorded yet.</p>";
+  } else {
+    report += "<ul>" + recent.map(function(a){
+      return "<li>" + reportSafe(formatDate(a.date)) + " \u2014 " + reportSafe(a.text) + "</li>";
+    }).join("") + "</ul>";
+  }
+
+  report += "<div class='student-report-footer'>";
+  report += "This report summarises learning records stored locally in the student's current browser/device. ";
+  report += "Generated by P-SIM MTCF 0114.";
+  report += "</div></div>";
+  return report;
+}
+
+function buildStandaloneStudentReportDocument(){
+  const report = buildStudentLearningReportHTML();
+  return "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'>" +
+    "<meta name='viewport' content='width=device-width,initial-scale=1.0'>" +
+    "<title>P-SIM MTCF 0114 Learning Report</title>" +
+    "<style>" +
+    "body{font-family:Arial,Helvetica,sans-serif;color:#111;background:#fff;margin:0;padding:30px;line-height:1.45}" +
+    ".student-report{max-width:900px;margin:0 auto}.student-report-header{display:flex;align-items:center;gap:14px;border-bottom:2px solid #4C1D95;padding-bottom:14px;margin-bottom:18px}" +
+    ".student-report-logo{width:58px;height:58px;border-radius:50%;object-fit:cover}.student-report h1{font-size:22px;margin:0 0 3px;color:#2B1742}.student-report h2{font-size:17px;margin:24px 0 10px;color:#4C1D95}" +
+    ".student-report p{margin:5px 0 9px}.student-report-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0 18px}.student-report-summary>div{border:1px solid #ddd;border-radius:8px;padding:10px}.student-report-summary strong{display:block;font-size:17px;color:#4C1D95}" +
+    "table{width:100%;border-collapse:collapse;margin:8px 0 14px;font-size:12px}th,td{border:1px solid #d8d8d8;padding:7px 8px;text-align:left;vertical-align:top}th{background:#f2edf9;color:#2B1742}" +
+    "ul{margin:6px 0 14px;padding-left:20px}.student-report-footer{margin-top:24px;padding-top:10px;border-top:1px solid #ccc;font-size:10px;color:#555}" +
+    ".report-actions{max-width:900px;margin:0 auto 20px;display:flex;gap:10px}.report-actions button{padding:10px 14px;border:1px solid #4C1D95;border-radius:8px;background:#4C1D95;color:#fff;cursor:pointer}.report-actions button+button{background:#fff;color:#4C1D95}" +
+    "@media print{body{padding:0}.report-actions{display:none}.student-report{max-width:none}.student-report *{-webkit-print-color-adjust:exact;print-color-adjust:exact}}" +
+    "@media(max-width:600px){body{padding:16px}.student-report-summary{grid-template-columns:1fr}.student-report-header{align-items:flex-start}}" +
+    "</style></head><body>" +
+    "<div class='report-actions'><button onclick='window.print()'>Print / Save as PDF</button><button onclick='history.back()'>Back</button></div>" +
+    report + "</body></html>";
+}
+
+function downloadStudentLearningReport(){
+  const p = appState.data.profile || {};
+  const documentHTML = buildStandaloneStudentReportDocument();
+  const blob = new Blob([documentHTML], {type:"text/html;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "P-SIM_MTCF0114_Learning_Report_" + reportFileSafeName(p.name) + ".html";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1500);
+  logActivity("Downloaded P-SIM learning report");
+}
+
+async function printStudentLearningReport(){
+  await agEnterPrintMode(buildStudentLearningReportHTML());
+  window.print();
 }
 
 /* ---- CSV export ---- */
